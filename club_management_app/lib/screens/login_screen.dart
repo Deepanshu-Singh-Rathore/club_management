@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   LoginScreen({super.key});
@@ -6,35 +7,38 @@ class LoginScreen extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  void loginUser() {
-    print("Email: ${emailController.text}");
-    print("Password: ${passwordController.text}");
+  void loginUser(BuildContext context) {
+    // Authentication logic here
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+
+    // Navigate to HomeScreen after successful login
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => HomeScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], 
+      backgroundColor: Colors.grey[100],
       body: Center(
         child: Container(
           // Yeh constraints ise desktop browser par bhi phone jaisa narrow look dengi
-          constraints: const BoxConstraints(maxWidth: 400), 
+          constraints: const BoxConstraints(maxWidth: 400),
           padding: const EdgeInsets.all(30),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20), 
+            borderRadius: BorderRadius.circular(20),
             boxShadow: const [
-              BoxShadow(
-                color: Colors.black12, 
-                blurRadius: 10, 
-                spreadRadius: 2,
-              )
+              BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 2),
             ],
           ),
           child: SingleChildScrollView(
             child: Column(
-              mainAxisSize: MainAxisSize.min, 
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.school, size: 80, color: Colors.blue),
                 const SizedBox(height: 10),
@@ -43,7 +47,7 @@ class LoginScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Email Field
                 TextField(
                   controller: emailController,
@@ -57,7 +61,7 @@ class LoginScreen extends StatelessWidget {
                     prefixIcon: const Icon(Icons.email),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
 
                 // Password Field
@@ -79,7 +83,7 @@ class LoginScreen extends StatelessWidget {
 
                 // Login Button
                 ElevatedButton(
-                  onPressed: loginUser,
+                  onPressed: () => loginUser(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -97,7 +101,7 @@ class LoginScreen extends StatelessWidget {
                 TextButton(
                   onPressed: () {},
                   child: const Text("Don't have an account? Register"),
-                )
+                ),
               ],
             ),
           ),

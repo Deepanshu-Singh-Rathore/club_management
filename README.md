@@ -2,7 +2,7 @@
 
 Frontend: Flutter
 Backend: Django
-Database: SQLite (for now)
+Database: PostgreSQL
 
 ## Team Members
 - Deepanshu Singh Rathore

@@ -1,112 +1,112 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import '../widgets/custom_button.dart';
+import '../widgets/custom_textfield.dart';
 
-class LoginScreen extends StatelessWidget {
-  LoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
 
-  void loginUser(BuildContext context) {
-    // Authentication logic here
-    String email = emailController.text.trim();
-    String password = passwordController.text.trim();
-
-    // Navigate to HomeScreen after successful login
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => HomeScreen()),
-    );
-  }
+class _LoginScreenState extends State<LoginScreen> {
+  bool isStudent = true; // Radio button state control karne ke liye
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Center(
-        child: Container(
-          // Yeh constraints ise desktop browser par bhi phone jaisa narrow look dengi
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(30),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 2),
-            ],
+      // Background gradient wahi purple wala
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF7B61FF), Color(0xFFF557FA)],
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.school, size: 80, color: Colors.blue),
-                const SizedBox(height: 10),
-                const Text(
-                  "Club Management App",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 30),
-
-                // Email Field
-                TextField(
-                  controller: emailController,
-                  decoration: InputDecoration(
-                    labelText: "Email",
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    prefixIcon: const Icon(Icons.email),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Password Field
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: "Password",
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    prefixIcon: const Icon(Icons.lock),
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                // Login Button
-                ElevatedButton(
-                  onPressed: () => loginUser(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text("Login", style: TextStyle(fontSize: 16)),
-                ),
-
-                const SizedBox(height: 15),
-
-                // Register Link
-                TextButton(
-                  onPressed: () {},
-                  child: const Text("Don't have an account? Register"),
-                ),
-              ],
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 80),
+            // Logo aur Name
+            const Icon(Icons.cloud_circle, size: 90, color: Colors.white),
+            const Text(
+              "ClubSphere",
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
             ),
-          ),
+            const Spacer(),
+            
+            // Deepanshu ka 'Metallic White' Form Area
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFBFCF6), // Metallic White
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(40),
+                  topRight: Radius.circular(40),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Naya Custom TextField Widget
+                  const CustomTextField(
+                    hintText: "Email", 
+                    icon: Icons.email_outlined
+                  ),
+                  const SizedBox(height: 20),
+                  const CustomTextField(
+                    hintText: "Password", 
+                    icon: Icons.lock_outline, 
+                    isPassword: true
+                  ),
+                  const SizedBox(height: 15),
+                  
+                  // Student/Admin Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Radio(
+                        value: true, 
+                        groupValue: isStudent, 
+                        activeColor: const Color(0xFF4A6CF7),
+                        onChanged: (v) => setState(() => isStudent = v as bool)
+                      ),
+                      const Text("Student", style: TextStyle(fontWeight: FontWeight.w500)),
+                      const SizedBox(width: 30),
+                      Radio(
+                        value: false, 
+                        groupValue: isStudent, 
+                        activeColor: const Color(0xFF4A6CF7),
+                        onChanged: (v) => setState(() => isStudent = v as bool)
+                      ),
+                      const Text("Admin", style: TextStyle(fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  const SizedBox(height: 25),
+                  
+                  // Naya Custom Button Widget
+                  CustomButton(
+                    text: "Login",
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      "Don't have an account? Signup",
+                      style: TextStyle(color: Color(0xFF4A6CF7), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-} // Semicolon hata diya gaya hai yahan se
+}

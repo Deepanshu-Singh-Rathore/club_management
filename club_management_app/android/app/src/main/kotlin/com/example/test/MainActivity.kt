@@ -1,4 +1,4 @@
-package com.example.club_management_app
+package com.example.test
 
 import io.flutter.embedding.android.FlutterActivity
 

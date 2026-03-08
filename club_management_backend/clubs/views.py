@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 
 from accounts.permissions import IsClubHeadOrAdmin, IsOwnerOrAdmin
 
@@ -21,11 +21,11 @@ from .serializers import (
 
 class ClubListCreateView(APIView):
     """
-    GET  /api/clubs/  – list all clubs (any authenticated user)
+    GET  /api/clubs/  – list all clubs (public)
     POST /api/clubs/  – create a club (club_head or admin only)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         clubs = Club.objects.all().select_related('created_by').prefetch_related('memberships')

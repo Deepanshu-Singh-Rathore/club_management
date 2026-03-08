@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'leaderboard_screen.dart';
-import 'registration_screen.dart'; // Naya registration page import kiya
+import 'registration_screen.dart';
+import '../services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,10 +12,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  List<dynamic> _events = [];
+  bool _loadingEvents = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      final events = await ApiService.getEvents();
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _loadingEvents = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingEvents = false);
+    }
+  }
+
+  // Fallback poster for events without an image_url
+  static const String _fallbackPoster =
+      'https://img.freepik.com/free-vector/modern-club-event-poster-template_23-2148902543.jpg';
 
   @override
   Widget build(BuildContext context) {
-    // Deepanshu ka Brilliant White Background
     const Color bgColor = Color(0xFFEDF1FE);
 
     return Scaffold(
@@ -28,15 +54,11 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.leaderboard_rounded,
-              color: Color(0xFF7B61FF),
-            ),
+            icon:
+                const Icon(Icons.leaderboard_rounded, color: Color(0xFF7B61FF)),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => const LeaderboardScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
             ),
           ),
         ],
@@ -49,48 +71,39 @@ class _HomeScreenState extends State<HomeScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               child: Text(
-                "Upcoming Events 📢",
+                "Upcoming Events ðŸ“¢",
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ),
 
-            // Poster Section (Horizontal Scrolling)
+            // Poster Section
             SizedBox(
               height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                itemCount: 3,
-                itemBuilder: (context, index) {
-                  return Container(
-                    width: 320,
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFBFCF6), // Metallic White
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+              child: _loadingEvents
+                  ? const Center(
+                      child:
+                          CircularProgressIndicator(color: Color(0xFF7B61FF)))
+                  : _events.isEmpty
+                      ? _staticEventCard(_fallbackPoster, 'No events yet')
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          itemCount: _events.length,
+                          itemBuilder: (context, index) {
+                            final event = _events[index];
+                            final imageUrl =
+                                (event['image_url'] as String?)?.isNotEmpty ==
+                                        true
+                                    ? event['image_url'] as String
+                                    : _fallbackPoster;
+                            return _eventCard(
+                                imageUrl, event['title'] as String? ?? '');
+                          },
                         ),
-                      ],
-                      // Filhal placeholder image hai, baad mein Deepanshu ke backend posters aayenge
-                      image: const DecorationImage(
-                        image: NetworkImage(
-                          "https://img.freepik.com/free-vector/modern-club-event-poster-template_23-2148902543.jpg",
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  );
-                },
-              ),
             ),
 
             const SizedBox(height: 30),
 
-            // Quick Actions Section
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
@@ -100,20 +113,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Club Registration Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const RegistrationScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const RegistrationScreen()),
                 ),
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F4EC), // Glistening White
+                    color: const Color(0xFFF4F4EC),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -121,38 +131,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.app_registration_rounded,
-                          color: Color(0xFF7B61FF),
-                        ),
+                            color: Colors.white, shape: BoxShape.circle),
+                        child: const Icon(Icons.app_registration_rounded,
+                            color: Color(0xFF7B61FF)),
                       ),
                       const SizedBox(width: 15),
                       const Text(
                         "Club Registration",
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                            fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       const Spacer(),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          size: 16, color: Colors.grey),
                     ],
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
-
-      // Nav Bar blending with BG
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Colors.black12, width: 0.5)),
@@ -167,18 +167,60 @@ class _HomeScreenState extends State<HomeScreen> {
           elevation: 0,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: "Home",
-            ),
+                icon: Icon(Icons.home_filled), label: "Home"),
             BottomNavigationBarItem(icon: Icon(Icons.search), label: "Explore"),
             BottomNavigationBarItem(
-              icon: Icon(Icons.notifications),
-              label: "Alerts",
-            ),
+                icon: Icon(Icons.notifications), label: "Alerts"),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _eventCard(String imageUrl, String title) {
+    return Container(
+      width: 320,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCF6),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
+        ],
+        image:
+            DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover),
+      ),
+      alignment: Alignment.bottomLeft,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(25),
+              bottomRight: Radius.circular(25)),
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [Colors.black.withOpacity(0.5), Colors.transparent],
+          ),
+        ),
+        child: Text(title,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14)),
+      ),
+    );
+  }
+
+  Widget _staticEventCard(String imageUrl, String title) {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      children: [_eventCard(imageUrl, title)],
     );
   }
 }

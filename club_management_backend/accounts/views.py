@@ -17,6 +17,8 @@ from .serializers import (
     VerifyOTPSerializer,
     UserSerializer,
     UserUpdateSerializer,
+    RegisterSerializer,
+    LoginSerializer,
 )
 
 
@@ -181,3 +183,85 @@ class UserProfileView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(UserSerializer(request.user).data)
+
+
+# ---------------------------------------------------------------------------
+# Register / Login (email + password)
+# ---------------------------------------------------------------------------
+
+class RegisterView(APIView):
+    """
+    POST /api/auth/register/
+    Creates a new user account with email and password.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.save()
+        tokens = get_tokens_for_user(user)
+        return Response(
+            {**tokens, 'user': UserSerializer(user).data},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class LoginView(APIView):
+    """
+    POST /api/auth/login/
+    Authenticates with email + password, returns JWT tokens.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'Invalid email or password.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.check_password(password):
+            return Response({'error': 'Invalid email or password.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.is_active:
+            return Response({'error': 'Account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
+
+        tokens = get_tokens_for_user(user)
+        return Response(
+            {**tokens, 'user': UserSerializer(user).data},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Leaderboard
+# ---------------------------------------------------------------------------
+
+class LeaderboardView(APIView):
+    """
+    GET /api/auth/leaderboard/
+    Returns users sorted by points descending (top 20).
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        users = User.objects.filter(is_active=True).order_by('-points')[:20]
+        data = [
+            {
+                'rank': idx + 1,
+                'id': str(u.id),
+                'full_name': u.full_name or u.email.split('@')[0],
+                'points': u.points,
+                'roll_number': u.roll_number or '',
+            }
+            for idx, u in enumerate(users)
+        ]
+        return Response(data)

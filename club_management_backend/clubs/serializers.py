@@ -38,11 +38,11 @@ class EventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = ('id', 'title', 'description', 'event_date', 'club', 'club_name', 'created_by', 'created_at')
+        fields = ('id', 'title', 'description', 'event_date', 'image_url', 'club', 'club_name', 'created_by', 'created_at')
         read_only_fields = ('id', 'created_by', 'created_at', 'club_name')
 
 
 class EventCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ('title', 'description', 'event_date', 'club')
+        fields = ('title', 'description', 'event_date', 'image_url', 'club')

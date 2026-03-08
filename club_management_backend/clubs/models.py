@@ -57,6 +57,7 @@ class Event(models.Model):
     title = models.CharField(max_length=300)
     description = models.TextField(blank=True)
     event_date = models.DateTimeField()
+    image_url = models.URLField(blank=True, null=True)
     club = models.ForeignKey(
         Club,
         on_delete=models.CASCADE,

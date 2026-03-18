@@ -9,4 +9,3 @@ Database: PostgreSQL
 - Taniya Joshi
 - Vineet Vyas
 - Tamanna Regar
-- Tanisha Soni

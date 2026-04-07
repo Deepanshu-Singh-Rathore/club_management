@@ -2,216 +2,303 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from accounts.permissions import IsClubHeadOrAdmin
+from accounts.permissions import IsStudent
+from .models import Notification
+from .serializers import NotificationSerializer
 
-from accounts.permissions import IsClubHeadOrAdmin, IsOwnerOrAdmin
-
-from .models import Club, Membership, Event
+from .models import Club, Membership, Event, EventRegistration
 from .serializers import (
     ClubSerializer,
     ClubCreateSerializer,
     MembershipSerializer,
     EventSerializer,
     EventCreateSerializer,
+    EventRegistrationSerializer
 )
+
+from accounts.permissions import IsOwnerOrAdmin
 
 
 # ---------------------------------------------------------------------------
-# Club Views
+# CLUB VIEWS
 # ---------------------------------------------------------------------------
 
 class ClubListCreateView(APIView):
-    """
-    GET  /api/clubs/  – list all clubs (any authenticated user)
-    POST /api/clubs/  – create a club (club_head or admin only)
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        clubs = Club.objects.all().select_related('created_by').prefetch_related('memberships')
-        serializer = ClubSerializer(clubs, many=True)
-        return Response(serializer.data)
+        clubs = Club.objects.select_related('created_by').prefetch_related('memberships')
+        return Response(ClubSerializer(clubs, many=True).data)
 
     def post(self, request):
-        # Only club_head or admin may create clubs
         if request.user.role not in ('club_head', 'admin'):
-            return Response(
-                {'error': 'Only club heads or admins can create clubs.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return Response({'error': 'Only club heads or admins can create clubs'}, status=403)
 
         serializer = ClubCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.is_valid():
+            club = serializer.save(created_by=request.user)
+            return Response(ClubSerializer(club).data, status=201)
 
-        club = serializer.save(created_by=request.user)
-        return Response(ClubSerializer(club).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=400)
 
 
 class ClubDetailView(APIView):
-    """
-    GET    /api/clubs/{id}/  – retrieve a club
-    PUT    /api/clubs/{id}/  – update (owner or admin)
-    DELETE /api/clubs/{id}/  – delete (admin only)
-    """
-
     permission_classes = [IsAuthenticated]
 
-    def _get_club(self, pk):
+    def get_object(self, pk):
         try:
             return Club.objects.get(pk=pk)
         except Club.DoesNotExist:
             return None
 
     def get(self, request, pk):
-        club = self._get_club(pk)
+        club = self.get_object(pk)
         if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Club not found'}, status=404)
+
         return Response(ClubSerializer(club).data)
 
     def put(self, request, pk):
-        club = self._get_club(pk)
+        club = self.get_object(pk)
         if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Club not found'}, status=404)
 
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, club):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        if not IsOwnerOrAdmin().has_object_permission(request, self, club):
+            return Response({'error': 'Permission denied'}, status=403)
 
         serializer = ClubCreateSerializer(club, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        club = serializer.save()
-        return Response(ClubSerializer(club).data)
+        if serializer.is_valid():
+            club = serializer.save()
+            return Response(ClubSerializer(club).data)
+
+        return Response(serializer.errors, status=400)
 
     def delete(self, request, pk):
-        club = self._get_club(pk)
+        club = self.get_object(pk)
         if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Club not found'}, status=404)
 
         if request.user.role != 'admin':
-            return Response({'error': 'Only admins can delete clubs.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Only admin can delete'}, status=403)
 
         club.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'message': 'Deleted'}, status=204)
 
 
 class ClubJoinView(APIView):
-    """
-    POST /api/clubs/{id}/join/  – join a club (any authenticated user)
-    """
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         try:
             club = Club.objects.get(pk=pk)
         except Club.DoesNotExist:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Club not found'}, status=404)
 
-        membership, created = Membership.objects.get_or_create(user=request.user, club=club)
-        if not created:
-            return Response({'message': 'You are already a member of this club.'}, status=status.HTTP_200_OK)
-
-        return Response(
-            MembershipSerializer(membership).data,
-            status=status.HTTP_201_CREATED,
+        membership, created = Membership.objects.get_or_create(
+            user=request.user,
+            club=club
         )
+
+        if not created:
+            return Response({'message': 'Already joined'}, status=200)
+
+        return Response(MembershipSerializer(membership).data, status=201)
 
 
 # ---------------------------------------------------------------------------
-# Event Views
+# EVENT VIEWS
 # ---------------------------------------------------------------------------
 
 class EventListCreateView(APIView):
-    """
-    GET  /api/events/  – list all events (any authenticated user)
-    POST /api/events/  – create an event (club_head or admin only)
-    """
-
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def get(self, request):
-        events = (
-            Event.objects.all()
-            .select_related('club', 'created_by')
-            .order_by('event_date')
-        )
-        # Optional filter by club
-        club_id = request.query_params.get('club')
-        if club_id:
-            events = events.filter(club_id=club_id)
-
-        serializer = EventSerializer(events, many=True)
-        return Response(serializer.data)
+        events = Event.objects.select_related('club', 'created_by')
+        return Response(EventSerializer(events, many=True).data)
 
     def post(self, request):
-        if request.user.role not in ('club_head', 'admin'):
-            return Response(
-                {'error': 'Only club heads or admins can create events.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+
+        
+        return Response({'error': 'Only club_head or admin can create event'}, status=403)
 
         serializer = EventCreateSerializer(data=request.data)
+
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            print("❌ EVENT CREATE ERROR:", serializer.errors)  # DEBUG LINE
+            return Response(serializer.errors, status=400)
 
-        # club_head may only create events for clubs they own (unless admin)
-        club = serializer.validated_data['club']
-        if request.user.role == 'club_head' and club.created_by != request.user:
-            return Response(
-                {'error': 'You can only create events for your own club.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        club = serializer.validated_data.get('club')
 
-        event = serializer.save(created_by=request.user)
-        return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
+        if not club:
+            return Response({"error": "club is required"}, status=400)
 
+        event = serializer.save(
+            created_by=request.user,
+            club=club
+        )
+
+        return Response(EventSerializer(event).data, status=201)
+
+
+# -------------------------------------------------------------------
+# EVENT DETAIL
+# -------------------------------------------------------------------
 
 class EventDetailView(APIView):
-    """
-    GET    /api/events/{id}/
-    PUT    /api/events/{id}/
-    DELETE /api/events/{id}/
-    """
-
     permission_classes = [IsAuthenticated]
 
-    def _get_event(self, pk):
+    def get_object(self, pk):
         try:
             return Event.objects.get(pk=pk)
         except Event.DoesNotExist:
             return None
 
     def get(self, request, pk):
-        event = self._get_event(pk)
+        event = self.get_object(pk)
         if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Event not found"}, status=404)
+
         return Response(EventSerializer(event).data)
 
-    def put(self, request, pk):
-        event = self._get_event(pk)
-        if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, event):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+# -------------------------------------------------------------------
+# APPLY EVENT (STUDENT)
+# -------------------------------------------------------------------
 
-        serializer = EventCreateSerializer(event, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        event = serializer.save()
-        return Response(EventSerializer(event).data)
+class ApplyEventView(APIView):
+    permission_classes = [IsAuthenticated, IsStudent]
 
-    def delete(self, request, pk):
-        event = self._get_event(pk)
-        if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+    def post(self, request, pk):
+        user = request.user
 
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, event):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            event = Event.objects.get(pk=pk)
+        except Event.DoesNotExist:
+            return Response({"error": "Event not found"}, status=404)
 
-        event.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        if EventRegistration.objects.filter(user=user, event=event).exists():
+            return Response({"message": "Already applied"}, status=400)
+
+        approved_count = EventRegistration.objects.filter(
+            event=event,
+            status="approved"
+        ).count()
+
+        if event.capacity and approved_count >= event.capacity:
+            return Response({"message": "Event full"}, status=400)
+
+        EventRegistration.objects.create(
+            user=user,
+            event=event,
+            status="pending"
+        )
+        Notification.objects.create(
+            user=event.created_by,
+         message=f"{user.username} applied for {event.title}",
+         type="apply"
+        )
+
+        return Response({"message": "Applied successfully"}, status=201)
+
+
+# -------------------------------------------------------------------
+# PENDING LIST (CLUB_HEAD / ADMIN)
+# -------------------------------------------------------------------
+
+class PendingRegistrationsView(APIView):
+    permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
+
+    def get(self, request, pk):
+
+        return Response({"error": "Permission denied"}, status=403)
+
+        regs = EventRegistration.objects.filter(event_id=pk, status="pending")
+
+        return Response(EventRegistrationSerializer(regs, many=True).data)
+
+
+# -------------------------------------------------------------------
+# APPROVE
+# -------------------------------------------------------------------
+
+class ApproveRegistrationView(APIView):
+    permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
+
+    def post(self, request, pk):
+
+        return Response({"error": "Permission denied"}, status=403)
+
+        reg_id = request.data.get("registration_id")
+
+        try:
+            reg = EventRegistration.objects.get(id=reg_id, event_id=pk)
+        except EventRegistration.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        approved = EventRegistration.objects.filter(
+            event_id=pk,
+            status="approved"
+        ).count()
+
+        if reg.event.capacity and approved >= reg.event.capacity:
+            return Response({"error": "Capacity full"}, status=400)
+
+        reg.status = "approved"
+        reg.save()
+        Notification.objects.create(
+            user=reg.user,
+            message=f"You are approved for {reg.event.title}",
+            type="approved"
+        )
+
+        return Response({"message": "Approved"})
+
+
+# -------------------------------------------------------------------
+# REJECT
+# -------------------------------------------------------------------
+
+class RejectRegistrationView(APIView):
+    permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
+
+    def post(self, request, pk):
+        
+        return Response({"error": "Permission denied"}, status=403)
+
+        reg_id = request.data.get("registration_id")
+
+        try:
+            reg = EventRegistration.objects.get(id=reg_id, event_id=pk)
+        except EventRegistration.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        reg.status = "rejected"
+        reg.save()
+
+        Notification.objects.create(
+            user=reg.user,
+            message=f"You are rejected for {reg.event.title}",
+            type="rejected"
+        )
+
+        return Response({"message": "Rejected"})
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(
+            user=request.user
+        ).order_by('-created_at')
+
+        return Response(NotificationSerializer(notifications, many=True).data)
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        notif = Notification.objects.get(pk=pk, user=request.user)
+        notif.is_read = True
+        notif.save()
+        return Response({"message": "Marked as read"})

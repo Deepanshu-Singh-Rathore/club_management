@@ -5,6 +5,7 @@ Django settings for ClubSphere – College Club Management System.
 from pathlib import Path
 from datetime import timedelta
 import environ
+import os
 
 # ---------------------------------------------------------------------------
 # Base directory & environment
@@ -19,7 +20,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # ---------------------------------------------------------------------------
 # Security
 # ---------------------------------------------------------------------------
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = 'django-insecure-abc123xyz456'
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2'])
 
@@ -88,9 +89,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME', default='clubsphere_db'),
+        'NAME': os.getenv('DB_NAME'),
         'USER': env('DB_USER', default='postgres'),
-        'PASSWORD': env('DB_PASSWORD'),
+        'PASSWORD': 'chiku',
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='5432'),
     }

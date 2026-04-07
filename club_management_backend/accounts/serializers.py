@@ -26,3 +26,7 @@ class RequestOTPSerializer(serializers.Serializer):
 class VerifyOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(min_length=6, max_length=6)
+
+
+
+

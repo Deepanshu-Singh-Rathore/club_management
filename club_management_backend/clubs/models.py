@@ -2,77 +2,117 @@ import uuid
 from django.db import models
 from django.conf import settings
 
+User = settings.AUTH_USER_MODEL
+
+
+# ---------------------------------------------------------------------------
+# CLUB
+# ---------------------------------------------------------------------------
 
 class Club(models.Model):
-    """A college club that can be created by a club_head or admin."""
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
+
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True,
         related_name='clubs_created',
         limit_choices_to={'role__in': ['club_head', 'admin']},
     )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'clubs'
         ordering = ['name']
 
-    def __str__(self):
-        return self.name
 
+# ---------------------------------------------------------------------------
+# MEMBERSHIP
+# ---------------------------------------------------------------------------
 
 class Membership(models.Model):
-    """Many-to-many relationship between users and clubs."""
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='memberships',
-    )
-    club = models.ForeignKey(
-        Club,
-        on_delete=models.CASCADE,
-        related_name='memberships',
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships')
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='memberships')
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'memberships'
         unique_together = ('user', 'club')
-        ordering = ['-joined_at']
 
-    def __str__(self):
-        return f'{self.user.email} → {self.club.name}'
 
+# ---------------------------------------------------------------------------
+# EVENT
+# ---------------------------------------------------------------------------
 
 class Event(models.Model):
-    """An event organised by a club."""
+    class Status(models.TextChoices):
+        UPCOMING = 'upcoming', 'Upcoming'
+        COMPLETED = 'completed', 'Completed'
+        CANCELLED = 'cancelled', 'Cancelled'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     title = models.CharField(max_length=300)
     description = models.TextField(blank=True)
+
     event_date = models.DateTimeField()
-    club = models.ForeignKey(
-        Club,
-        on_delete=models.CASCADE,
-        related_name='events',
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.UPCOMING   # ✅ FIX HERE
     )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='events_created',
+
+    capacity = models.IntegerField(default=0)
+
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='events')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+# ---------------------------------------------------------------------------
+# EVENT REGISTRATION
+# ---------------------------------------------------------------------------
+
+class EventRegistration(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_registrations')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='registrations')
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING   # ✅ FIX HERE
     )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'events'
-        ordering = ['event_date']
+        unique_together = ('user', 'event')
+
+class Notification(models.Model):
+    TYPE_CHOICES = (
+        ("apply", "Apply"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    message = models.TextField()
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.title} ({self.club.name})'
+        return f"{self.user} - {self.type}"

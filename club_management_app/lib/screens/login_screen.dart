@@ -14,204 +14,168 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Screen dimensions nikalne ke liye
+    double screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Background Gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D47A1), Color(0xFF1976D2), Colors.white],
-              ),
-            ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFADCFFF), Color(0xFF1565C0)],
           ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            // Scrollable taaki keyboard khulne pe error na aaye
+            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
+            child: Column(
+              children: [
+                SizedBox(height: screenWidth * 0.1),
 
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 25),
-              child: Column(
-                children: [
-                  const SizedBox(height: 50),
-
-                  // 2. FIXED LOGO SECTION (Simplified)
-                  Center(
-                    child: Container(
-                      height: 150,
-                      width: 150,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1), // Halka sa glow
-                        shape: BoxShape.circle,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(75),
-                        child: Image.asset(
-                          'assets/images/logo.png', // Check karein ye path sahi hai
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // Agar image load nahi hui to icon dikhega
-                            return const Icon(
-                              Icons.shield,
-                              size: 80,
-                              color: Colors.white,
-                            );
-                          },
-                        ),
-                      ),
+                // Responsive Logo
+                Container(
+                  width: screenWidth * 0.3, // Screen ka 30% width
+                  height: screenWidth * 0.3,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF0D47A1),
+                    image: DecorationImage(
+                      image: AssetImage("assets/images/logo.png"),
+                      fit: BoxFit.cover,
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 10),
-                  const Text(
-                    "ClubSphere",
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                const SizedBox(height: 10),
+                Text(
+                  "ClubSphere",
+                  style: TextStyle(
+                    fontSize: screenWidth * 0.08, // Dynamic font size
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
+                ),
+                SizedBox(height: screenWidth * 0.08),
 
-                  const SizedBox(height: 40),
-
-                  // 3. Login Card
-                  Container(
-                    padding: const EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 20,
-                          offset: Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Welcome Back",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
-                          ),
-                        ),
-                        const SizedBox(height: 25),
-
-                        _buildField(
-                          _emailController,
-                          Icons.alternate_email_rounded,
-                          "Email Address",
-                        ),
-                        const SizedBox(height: 15),
-                        _buildField(
-                          _passController,
-                          Icons.lock_outline_rounded,
-                          "Password",
-                          isPass: true,
-                        ),
-
-                        const SizedBox(height: 15),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _roleOption("Student", 0),
-                            const SizedBox(width: 20),
-                            _roleOption("Admin", 1),
-                          ],
-                        ),
-
-                        const SizedBox(height: 25),
-
-                        GestureDetector(
-                          onTap: _performLogin,
-                          child: Container(
-                            width: double.infinity,
-                            height: 55,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(15),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
-                              ),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                "Login",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(context, '/signup'),
-                          child: const Text(
-                            "New here? Create Account",
+                // Responsive Card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Welcome Back",
                             style: TextStyle(
-                              color: Color(0xFF1976D2),
-                              fontWeight: FontWeight.w600,
+                              fontSize: screenWidth * 0.055,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0D47A1),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "👋",
+                            style: TextStyle(fontSize: screenWidth * 0.06),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      _buildField("Email Address"),
+                      const SizedBox(height: 15),
+                      _buildField("Password", isPassword: true),
+
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _roleOption("Student", 0),
+                          _roleOption("Admin", 1),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1976D2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            "Login",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/signup'),
+                        child: const Text(
+                          "New here? Create Account",
+                          style: TextStyle(color: Color(0xFF1565C0)),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // --- Helper Widgets ---
   Widget _roleOption(String title, int value) {
     return Row(
       children: [
         Radio(
           value: value,
           groupValue: _userType,
-          onChanged: (v) => setState(() => _userType = v!),
+          onChanged: (v) => setState(() => _userType = v as int),
           activeColor: const Color(0xFF0D47A1),
         ),
-        Text(title),
+        Text(title, style: const TextStyle(fontSize: 14)),
       ],
     );
   }
 
-  Widget _buildField(
-    TextEditingController controller,
-    IconData icon,
-    String hint, {
-    bool isPass = false,
-  }) {
+  Widget _buildField(String hint, {bool isPassword = false}) {
     return TextField(
-      controller: controller,
-      obscureText: isPass,
+      obscureText: isPassword,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: const Color(0xFF1976D2)),
         hintText: hint,
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: const Color(0xFFF5F5F5),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 15,
+          vertical: 15,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
       ),
     );
-  }
-
-  void _performLogin() {
-    if (_emailController.text.isNotEmpty && _passController.text.isNotEmpty) {
-      Navigator.pushReplacementNamed(context, '/home');
-    }
   }
 }

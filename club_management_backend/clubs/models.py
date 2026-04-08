@@ -59,11 +59,11 @@ class Event(models.Model):
     description = models.TextField(blank=True)
 
     event_date = models.DateTimeField()
-
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.UPCOMING   # ✅ FIX HERE
+    image_url = models.URLField(blank=True, null=True)
+    club = models.ForeignKey(
+        Club,
+        on_delete=models.CASCADE,
+        related_name='events',
     )
 
     capacity = models.IntegerField(default=0)

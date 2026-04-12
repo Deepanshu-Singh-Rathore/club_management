@@ -1,9 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import EventRegistration
-from rest_framework.decorators import action
 from accounts.serializers import UserSerializer
-from .models import Club, Membership, Event, Notification
+from .models import Club, Membership, Event, EventRegistration, Notification
 
 
 # ---------------------------------------------------------------------------
@@ -68,3 +66,28 @@ class EventCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ('title', 'description', 'event_date', 'image_url', 'club')
+
+
+# ---------------------------------------------------------------------------
+# Event Registration Serializer
+# ---------------------------------------------------------------------------
+
+class EventRegistrationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    event = EventSerializer(read_only=True)
+
+    class Meta:
+        model = EventRegistration
+        fields = ('id', 'user', 'event', 'status', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+# ---------------------------------------------------------------------------
+# Notification Serializer
+# ---------------------------------------------------------------------------
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ('id', 'message', 'type', 'is_read', 'created_at')
+        read_only_fields = ('id', 'created_at')

@@ -3,17 +3,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 
-from .models import Club, Membership, Event, EventRegistration
+from .models import Club, Membership, Event, EventRegistration, Notification
 from .serializers import (
     ClubSerializer,
     ClubCreateSerializer,
     MembershipSerializer,
     EventSerializer,
     EventCreateSerializer,
-    EventRegistrationSerializer
+    EventRegistrationSerializer,
+    NotificationSerializer,
 )
 
-from accounts.permissions import IsOwnerOrAdmin
+from accounts.permissions import IsOwnerOrAdmin, IsClubHeadOrAdmin, IsStudent
 
 
 # ---------------------------------------------------------------------------
@@ -112,21 +113,19 @@ class ClubJoinView(APIView):
 # ---------------------------------------------------------------------------
 
 class EventListCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         events = Event.objects.select_related('club', 'created_by')
         return Response(EventSerializer(events, many=True).data)
 
     def post(self, request):
-
-        
-        return Response({'error': 'Only club_head or admin can create event'}, status=403)
+        if request.user.role not in ('club_head', 'admin'):
+            return Response({'error': 'Only club_head or admin can create event'}, status=403)
 
         serializer = EventCreateSerializer(data=request.data)
 
         if not serializer.is_valid():
-            print("❌ EVENT CREATE ERROR:", serializer.errors)  # DEBUG LINE
             return Response(serializer.errors, status=400)
 
         club = serializer.validated_data.get('club')
@@ -196,8 +195,8 @@ class ApplyEventView(APIView):
         )
         Notification.objects.create(
             user=event.created_by,
-         message=f"{user.username} applied for {event.title}",
-         type="apply"
+            message=f"{user.full_name} applied for {event.title}",
+            type="apply"
         )
 
         return Response({"message": "Applied successfully"}, status=201)
@@ -211,11 +210,7 @@ class PendingRegistrationsView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def get(self, request, pk):
-
-        return Response({"error": "Permission denied"}, status=403)
-
         regs = EventRegistration.objects.filter(event_id=pk, status="pending")
-
         return Response(EventRegistrationSerializer(regs, many=True).data)
 
 
@@ -227,9 +222,6 @@ class ApproveRegistrationView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def post(self, request, pk):
-
-        return Response({"error": "Permission denied"}, status=403)
-
         reg_id = request.data.get("registration_id")
 
         try:
@@ -264,9 +256,6 @@ class RejectRegistrationView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def post(self, request, pk):
-        
-        return Response({"error": "Permission denied"}, status=403)
-
         reg_id = request.data.get("registration_id")
 
         try:
@@ -285,6 +274,7 @@ class RejectRegistrationView(APIView):
 
         return Response({"message": "Rejected"})
 
+
 class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -295,11 +285,15 @@ class NotificationListView(APIView):
 
         return Response(NotificationSerializer(notifications, many=True).data)
 
+
 class MarkNotificationReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        notif = Notification.objects.get(pk=pk, user=request.user)
+        try:
+            notif = Notification.objects.get(pk=pk, user=request.user)
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification not found"}, status=404)
         notif.is_read = True
         notif.save()
         return Response({"message": "Marked as read"})

@@ -68,7 +68,6 @@ class Event(models.Model):
 
     capacity = models.IntegerField(default=0)
 
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='events')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -13,6 +13,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
     DEBUG=(bool, False),
+    ALLOWED_HOSTS=(list, []),
+    EMAIL_BACKEND=(str, 'django.core.mail.backends.console.EmailBackend'),
+    EMAIL_HOST=(str, 'smtp.gmail.com'),
+    EMAIL_PORT=(int, 587),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_HOST_USER=(str, ''),
+    EMAIL_HOST_PASSWORD=(str, ''),
+    DEFAULT_FROM_EMAIL=(str, 'ClubSphere <noreply@clubsphere.com>'),
+    WHATSAPP_BOT_URL=(str, 'http://localhost:3001'),
+    WHATSAPP_BOT_TOKEN=(str, ''),
 )
 environ.Env.read_env(BASE_DIR / '.env')
 
@@ -21,7 +31,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # ---------------------------------------------------------------------------
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -40,6 +50,8 @@ INSTALLED_APPS = [
     # Local
     'accounts',
     'clubs',
+    'events',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -83,16 +95,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ---------------------------------------------------------------------------
-# Database – PostgreSQL via environment variables
+# Database – SQLite for development (zero setup), PostgreSQL for production
 # ---------------------------------------------------------------------------
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME', default='clubsphere_db'),
-        'USER': env('DB_USER', default='postgres'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST', default='localhost'),
-        'PORT': env('DB_PORT', default='5432'),
+        'NAME': 'club_management',
+        'USER': 'postgres',
+        'PASSWORD': 'root',
+        'HOST': 'localhost',  # Or the IP address of your DB server
+        'PORT': '5432',       # Default PostgreSQL port
     }
 }
 
@@ -137,13 +149,13 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
-EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='ClubSphere <noreply@clubsphere.com>')
+EMAIL_BACKEND = env('EMAIL_BACKEND')
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env.int('EMAIL_PORT')
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 
 # ---------------------------------------------------------------------------
 # Internationalisation
@@ -159,3 +171,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ---------------------------------------------------------------------------
+# WhatsApp Bot integration
+# ---------------------------------------------------------------------------
+WHATSAPP_BOT_URL   = env('WHATSAPP_BOT_URL')
+WHATSAPP_BOT_TOKEN = env('WHATSAPP_BOT_TOKEN')

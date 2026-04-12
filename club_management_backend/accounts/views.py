@@ -197,13 +197,13 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         user = serializer.save()
         tokens = get_tokens_for_user(user)
         return Response(
-            {**tokens, 'user': UserSerializer(user).data},
+            {**tokens, 'role': user.role, 'user': UserSerializer(user).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -236,7 +236,7 @@ class LoginView(APIView):
 
         tokens = get_tokens_for_user(user)
         return Response(
-            {**tokens, 'user': UserSerializer(user).data},
+            {**tokens, 'role': user.role, 'user': UserSerializer(user).data},
             status=status.HTTP_200_OK,
         )
 

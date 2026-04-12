@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/deepa/College/club_project/whatsapp_bot//**)",
+      "Read(//c/Users/deepa/College/club_project//**)",
+      "Read(//c/Users/deepa/College/club_project/club_management_backend//**)"
+    ]
+  }
+}

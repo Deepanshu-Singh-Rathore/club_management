@@ -26,54 +26,32 @@ class Club(models.Model):
         return self.name
 
 
-class Membership(models.Model):
-    """Many-to-many relationship between users and clubs."""
+class JoinRequest(models.Model):
+    """Request from a student to join a club."""
 
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='memberships',
+        related_name='join_requests',
     )
     club = models.ForeignKey(
         Club,
         on_delete=models.CASCADE,
-        related_name='memberships',
+        related_name='join_requests',
     )
-    joined_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'memberships'
-        unique_together = ('user', 'club')
-        ordering = ['-joined_at']
-
-    def __str__(self):
-        return f'{self.user.email} → {self.club.name}'
-
-
-class Event(models.Model):
-    """An event organised by a club."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=300)
-    description = models.TextField(blank=True)
-    event_date = models.DateTimeField()
-    image_url = models.URLField(blank=True, null=True)
-    club = models.ForeignKey(
-        Club,
-        on_delete=models.CASCADE,
-        related_name='events',
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='events_created',
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'events'
-        ordering = ['event_date']
+        db_table = 'join_requests'
+        ordering = ['-created_at']
+        unique_together = ('user', 'club')
 
     def __str__(self):
-        return f'{self.title} ({self.club.name})'
+        return f'{self.user.email} -> {self.club.name} ({self.status})'

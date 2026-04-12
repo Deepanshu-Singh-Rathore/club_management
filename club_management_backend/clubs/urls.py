@@ -1,19 +1,13 @@
-from django.urls import path
-from .views import (
-    ClubListCreateView,
-    ClubDetailView,
-    ClubJoinView,
-    EventListCreateView,
-    EventDetailView,
-)
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from .views import ClubViewSet, JoinRequestViewSet
+
+router = DefaultRouter()
+router.register(r'clubs', ClubViewSet, basename='club')
+router.register(r'join-requests', JoinRequestViewSet, basename='join-request')
 
 urlpatterns = [
-    # Clubs
-    path('clubs/', ClubListCreateView.as_view(), name='club-list-create'),
-    path('clubs/<uuid:pk>/', ClubDetailView.as_view(), name='club-detail'),
-    path('clubs/<uuid:pk>/join/', ClubJoinView.as_view(), name='club-join'),
-    # Events
-    path('events/', EventListCreateView.as_view(), name='event-list-create'),
-    path('events/<uuid:pk>/', EventDetailView.as_view(), name='event-detail'),
+    path('', include(router.urls)),
 ]
 

@@ -1,217 +1,95 @@
-from rest_framework.views import APIView
+from rest_framework import status, viewsets, mixins
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 
-from accounts.permissions import IsClubHeadOrAdmin, IsOwnerOrAdmin
-
-from .models import Club, Membership, Event
-from .serializers import (
-    ClubSerializer,
-    ClubCreateSerializer,
-    MembershipSerializer,
-    EventSerializer,
-    EventCreateSerializer,
-)
+from accounts.permissions import IsAdmin, IsClubHeadOrAdmin
+from .models import Club, JoinRequest
+from .serializers import ClubSerializer, ClubCreateSerializer, JoinRequestSerializer
 
 
 # ---------------------------------------------------------------------------
 # Club Views
 # ---------------------------------------------------------------------------
 
-class ClubListCreateView(APIView):
-    """
-    GET  /api/clubs/  – list all clubs (public)
-    POST /api/clubs/  – create a club (club_head or admin only)
-    """
+class ClubViewSet(viewsets.ModelViewSet):
+    """Club APIs: list/retrieve for all, create for admin only."""
 
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    queryset = Club.objects.select_related('created_by').all().order_by('name')
 
-    def get(self, request):
-        clubs = Club.objects.all().select_related('created_by').prefetch_related('memberships')
-        serializer = ClubSerializer(clubs, many=True)
-        return Response(serializer.data)
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsAdmin()]
+        return [IsAuthenticated(), IsAdmin()]
 
-    def post(self, request):
-        # Only club_head or admin may create clubs
-        if request.user.role not in ('club_head', 'admin'):
-            return Response(
-                {'error': 'Only club heads or admins can create clubs.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return ClubCreateSerializer
+        return ClubSerializer
 
-        serializer = ClubCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        club = serializer.save(created_by=request.user)
-        return Response(ClubSerializer(club).data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        created_by_id = serializer.validated_data.pop('created_by_id', None)
+        if created_by_id:
+            serializer.save(created_by_id=created_by_id)
+            return
+        serializer.save(created_by=self.request.user)
 
 
-class ClubDetailView(APIView):
-    """
-    GET    /api/clubs/{id}/  – retrieve a club
-    PUT    /api/clubs/{id}/  – update (owner or admin)
-    DELETE /api/clubs/{id}/  – delete (admin only)
-    """
+class JoinRequestViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Join request APIs for students and club heads/admin approvals."""
 
+    serializer_class = JoinRequestSerializer
     permission_classes = [IsAuthenticated]
 
-    def _get_club(self, pk):
-        try:
-            return Club.objects.get(pk=pk)
-        except Club.DoesNotExist:
-            return None
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return JoinRequest.objects.select_related('user', 'club').all()
+        if user.role == 'club_head':
+            return JoinRequest.objects.select_related('user', 'club').filter(club__created_by=user)
+        return JoinRequest.objects.select_related('user', 'club').filter(user=user)
 
-    def get(self, request, pk):
-        club = self._get_club(pk)
-        if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(ClubSerializer(club).data)
+    def create(self, request, *args, **kwargs):
+        if request.user.role != 'student':
+            return Response({'detail': 'Only students can send join requests.'}, status=status.HTTP_403_FORBIDDEN)
 
-    def put(self, request, pk):
-        club = self._get_club(pk)
-        if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
 
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, club):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        club_id = serializer.validated_data.get('club_id')
+        exists = JoinRequest.objects.filter(user=request.user, club_id=club_id).exists()
+        if exists:
+            return Response({'detail': 'Join request already exists for this club.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = ClubCreateSerializer(club, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        club = serializer.save()
-        return Response(ClubSerializer(club).data)
+        join_request = serializer.save()
+        output = JoinRequestSerializer(join_request).data
+        return Response(output, status=status.HTTP_201_CREATED)
 
-    def delete(self, request, pk):
-        club = self._get_club(pk)
-        if not club:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsClubHeadOrAdmin])
+    def approve(self, request, pk=None):
+        join_request = self.get_object()
+        if request.user.role == 'club_head' and join_request.club.created_by_id != request.user.id:
+            return Response({'detail': 'You can approve only your club requests.'}, status=status.HTTP_403_FORBIDDEN)
+        if join_request.status != JoinRequest.Status.PENDING:
+            return Response({'detail': 'Only pending requests can be approved.'}, status=status.HTTP_400_BAD_REQUEST)
+        join_request.status = JoinRequest.Status.APPROVED
+        join_request.save(update_fields=['status'])
+        return Response(JoinRequestSerializer(join_request).data)
 
-        if request.user.role != 'admin':
-            return Response({'error': 'Only admins can delete clubs.'}, status=status.HTTP_403_FORBIDDEN)
-
-        club.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ClubJoinView(APIView):
-    """
-    POST /api/clubs/{id}/join/  – join a club (any authenticated user)
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        try:
-            club = Club.objects.get(pk=pk)
-        except Club.DoesNotExist:
-            return Response({'error': 'Club not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        membership, created = Membership.objects.get_or_create(user=request.user, club=club)
-        if not created:
-            return Response({'message': 'You are already a member of this club.'}, status=status.HTTP_200_OK)
-
-        return Response(
-            MembershipSerializer(membership).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Event Views
-# ---------------------------------------------------------------------------
-
-class EventListCreateView(APIView):
-    """
-    GET  /api/events/  – list all events (any authenticated user)
-    POST /api/events/  – create an event (club_head or admin only)
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        events = (
-            Event.objects.all()
-            .select_related('club', 'created_by')
-            .order_by('event_date')
-        )
-        # Optional filter by club
-        club_id = request.query_params.get('club')
-        if club_id:
-            events = events.filter(club_id=club_id)
-
-        serializer = EventSerializer(events, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        if request.user.role not in ('club_head', 'admin'):
-            return Response(
-                {'error': 'Only club heads or admins can create events.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        serializer = EventCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # club_head may only create events for clubs they own (unless admin)
-        club = serializer.validated_data['club']
-        if request.user.role == 'club_head' and club.created_by != request.user:
-            return Response(
-                {'error': 'You can only create events for your own club.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        event = serializer.save(created_by=request.user)
-        return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
-
-
-class EventDetailView(APIView):
-    """
-    GET    /api/events/{id}/
-    PUT    /api/events/{id}/
-    DELETE /api/events/{id}/
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def _get_event(self, pk):
-        try:
-            return Event.objects.get(pk=pk)
-        except Event.DoesNotExist:
-            return None
-
-    def get(self, request, pk):
-        event = self._get_event(pk)
-        if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(EventSerializer(event).data)
-
-    def put(self, request, pk):
-        event = self._get_event(pk)
-        if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, event):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = EventCreateSerializer(event, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        event = serializer.save()
-        return Response(EventSerializer(event).data)
-
-    def delete(self, request, pk):
-        event = self._get_event(pk)
-        if not event:
-            return Response({'error': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        permission = IsOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, event):
-            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-
-        event.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsClubHeadOrAdmin])
+    def reject(self, request, pk=None):
+        join_request = self.get_object()
+        if request.user.role == 'club_head' and join_request.club.created_by_id != request.user.id:
+            return Response({'detail': 'You can reject only your club requests.'}, status=status.HTTP_403_FORBIDDEN)
+        if join_request.status != JoinRequest.Status.PENDING:
+            return Response({'detail': 'Only pending requests can be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        join_request.status = JoinRequest.Status.REJECTED
+        join_request.save(update_fields=['status'])
+        return Response(JoinRequestSerializer(join_request).data)

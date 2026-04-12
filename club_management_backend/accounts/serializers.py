@@ -24,7 +24,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(min_length=6, write_only=True)
     roll_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
-    role = serializers.ChoiceField(choices=['student', 'admin'], default='student')
+    role = serializers.ChoiceField(choices=['student', 'club_head', 'admin'], default='student')
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -34,6 +34,15 @@ class RegisterSerializer(serializers.Serializer):
     def validate_roll_number(self, value):
         if value and User.objects.filter(roll_number=value).exists():
             raise serializers.ValidationError('A user with this roll number already exists.')
+        return value
+
+    def validate_role(self, value):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            if value != 'student':
+                raise serializers.ValidationError('Public registration is allowed only for student role.')
+        elif request.user.role != 'admin' and value in ('club_head', 'admin'):
+            raise serializers.ValidationError('Only admins can create club_head or admin users.')
         return value
 
     def create(self, validated_data):

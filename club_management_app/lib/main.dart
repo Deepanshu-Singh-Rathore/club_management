@@ -1,26 +1,54 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'core/index.dart';
+import 'providers/index.dart';
+import 'screens/auth/splash_screen.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize API service
+  final apiService = ApiService();
+  await apiService.init();
+
+  runApp(MyApp(apiService: apiService));
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ApiService apiService;
+
+  const MyApp({Key? key, required this.apiService}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        // Brilliant White background for a clean look
-        scaffoldBackgroundColor: const Color(0xFFEDF1FE), 
-        primaryColor: const Color(0xFF7B61FF),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF7B61FF),
-          foregroundColor: Colors.white,
-          elevation: 0,
+    return MultiProvider(
+      providers: [
+        // Initialize API service as a provider
+        Provider<ApiService>(create: (_) => apiService),
+
+        // Providers
+        ChangeNotifierProvider(
+          create: (context) => AuthProvider(apiService)..init(),
         ),
+        ChangeNotifierProvider(
+          create: (context) => ClubProvider(apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => JoinRequestProvider(apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => EventProvider(apiService),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Club Management',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme(),
+        darkTheme: AppTheme.darkTheme(),
+        themeMode: ThemeMode.light,
+        routes: AppRoutes.getRoutes(),
+        initialRoute: '/',
       ),
-      home: const LoginScreen(),
     );
   }
 }

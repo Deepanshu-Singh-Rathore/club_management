@@ -24,10 +24,14 @@ class IsClubHead(BasePermission):
 
 
 class IsStudent(BasePermission):
-    """Allow access to any authenticated user (student, club_head, or admin)."""
+    """Allow access only to users with the student role."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated)
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == 'student'
+        )
 
 
 class IsClubHeadOrAdmin(BasePermission):

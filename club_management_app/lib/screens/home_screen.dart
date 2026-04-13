@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 // Blue shades and font styles from your design
 const Color primaryBlue = Color(0xFF1565C0);
@@ -252,6 +252,52 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _eventCard(String imageUrl, String title) {
+    return Container(
+      width: 320,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCF6),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
+        ],
+        image:
+            DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover),
+      ),
+      alignment: Alignment.bottomLeft,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(25),
+              bottomRight: Radius.circular(25)),
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [Colors.black.withOpacity(0.5), Colors.transparent],
+          ),
+        ),
+        child: Text(title,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14)),
+      ),
+    );
+  }
+
+  Widget _staticEventCard(String imageUrl, String title) {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      children: [_eventCard(imageUrl, title)],
     );
   }
 }

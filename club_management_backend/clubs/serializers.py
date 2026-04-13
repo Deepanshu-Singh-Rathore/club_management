@@ -60,58 +60,11 @@ class EventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = (
-            'id',
-            'title',
-            'description',
-            'event_date',
-            'status',
-            'capacity',
-            'club',
-            'club_name',
-            'created_by',
-            'created_at',
-        )
-        read_only_fields = (
-            'id',
-            'created_by',
-            'created_at',
-            'club_name',
-        )
+        fields = ('id', 'title', 'description', 'event_date', 'image_url', 'club', 'club_name', 'created_by', 'created_at')
+        read_only_fields = ('id', 'created_by', 'created_at', 'club_name')
 
 
 class EventCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ('title', 'description', 'event_date', 'club', 'capacity')
-
-    def validate_event_date(self, value):
-        """Prevent creating events in the past."""
-        if value < timezone.now():
-            raise serializers.ValidationError("Event date cannot be in the past.")
-        return value
-
-class EventRegistrationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EventRegistration
-        fields = '__all__'
-        read_only_fields = ('id', 'user', 'status', 'created_at')
-
-
-@action(detail=True, methods=['get'])
-def pending(self, request, pk=None):
-    event = self.get_object()
-
-    pending_users = EventRegistration.objects.filter(
-        event=event,
-        status='pending'
-    )
-
-    serializer = EventRegistrationSerializer(pending_users, many=True)
-    return Response(serializer.data)
-
-class NotificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Notification
-        fields = '__all__'
-        
+        fields = ('title', 'description', 'event_date', 'image_url', 'club')

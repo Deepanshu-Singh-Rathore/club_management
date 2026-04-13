@@ -11,14 +11,16 @@ from django.utils import timezone
 class UserManager(BaseUserManager):
     """Manager for the custom User model that uses email as the username."""
 
-    def create_user(self, email, full_name='', **extra_fields):
+    def create_user(self, email, full_name='', password=None, **extra_fields):
         if not email:
             raise ValueError('Email address is required.')
         email = self.normalize_email(email)
         extra_fields.setdefault('is_active', True)
         user = self.model(email=email, full_name=full_name, **extra_fields)
-        # Passwordless – no usable password stored
-        user.set_unusable_password()
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
@@ -52,7 +54,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     full_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
+    roll_number = models.CharField(max_length=30, blank=True, null=True, unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
+    points = models.PositiveIntegerField(default=0)
     is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

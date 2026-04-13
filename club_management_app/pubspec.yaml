@@ -1,5 +1,5 @@
 name: club_management_app
-description: "A new Flutter project."
+description: "A new Flutter project for ClubSphere."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -18,7 +18,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Assets section ko maine yahan sahi spacing ke saath add kar diya hai
+  # Assets section with correct spacing
   assets:
-    - assets/images/
-    
+    - assets/images/logo.png
+    - assets/images/  # Puri folder include karne ke liye

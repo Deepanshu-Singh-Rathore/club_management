@@ -12,10 +12,39 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passController = TextEditingController();
   int _userType = 0; // 0 for Student, 1 for Admin
 
+  // Validation function
+  void _handleLogin() {
+    String email = _emailController.text.trim();
+    String password = _passController.text.trim();
+
+    if (email.isEmpty) {
+      _showError("Please enter your email");
+    } else if (!email.contains('@')) {
+      _showError("Please enter a valid email");
+    } else if (password.isEmpty) {
+      _showError("Please enter your password");
+    } else if (password.length < 6) {
+      _showError("Password must be at least 6 characters");
+    } else {
+      // AGAR SAB SAHI HAI: Tabhi aage jayega
+      Navigator.pushNamed(context, '/signup');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Screen dimensions nikalne ke liye
     double screenWidth = MediaQuery.of(context).size.width;
+    double contentWidth = screenWidth > 500 ? 400 : screenWidth * 0.85;
 
     return Scaffold(
       body: Container(
@@ -29,116 +58,123 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            // Scrollable taaki keyboard khulne pe error na aaye
-            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
-            child: Column(
-              children: [
-                SizedBox(height: screenWidth * 0.1),
-
-                // Responsive Logo
-                Container(
-                  width: screenWidth * 0.3, // Screen ka 30% width
-                  height: screenWidth * 0.3,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF0D47A1),
-                    image: DecorationImage(
-                      image: AssetImage("assets/images/logo.png"),
-                      fit: BoxFit.cover,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: SizedBox(
+                width: contentWidth,
+                child: Column(
+                  children: [
+                    // Logo
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF0D47A1),
+                        image: DecorationImage(
+                          image: AssetImage("assets/images/logo.png"),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      "ClubSphere",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
 
-                const SizedBox(height: 10),
-                Text(
-                  "ClubSphere",
-                  style: TextStyle(
-                    fontSize: screenWidth * 0.08, // Dynamic font size
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(height: screenWidth * 0.08),
-
-                // Responsive Card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    // Login Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            "Welcome Back",
+                          const Text(
+                            "Welcome Back 👋",
                             style: TextStyle(
-                              fontSize: screenWidth * 0.055,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF0D47A1),
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            "👋",
-                            style: TextStyle(fontSize: screenWidth * 0.06),
+                          const SizedBox(height: 20),
+
+                          _buildField("Email Address", _emailController),
+                          const SizedBox(height: 15),
+                          _buildField(
+                            "Password",
+                            _passController,
+                            isPassword: true,
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Student/Admin Switch
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _roleOption("Student", 0),
+                              _roleOption("Admin", 1),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          // LOGIN BUTTON
+                          SizedBox(
+                            width: double.infinity,
+                            height: 45,
+                            child: ElevatedButton(
+                              onPressed: _handleLogin, // Calling validation
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1976D2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text(
+                                "Login",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/signup'),
+                            child: const Text(
+                              "New here? Create Account",
+                              style: TextStyle(
+                                color: Color(0xFF1565C0),
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-
-                      _buildField("Email Address"),
-                      const SizedBox(height: 15),
-                      _buildField("Password", isPassword: true),
-
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _roleOption("Student", 0),
-                          _roleOption("Admin", 1),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1976D2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            "Login",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/signup'),
-                        child: const Text(
-                          "New here? Create Account",
-                          style: TextStyle(color: Color(0xFF1565C0)),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -148,6 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _roleOption(String title, int value) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Radio(
           value: value,
@@ -155,24 +192,31 @@ class _LoginScreenState extends State<LoginScreen> {
           onChanged: (v) => setState(() => _userType = v as int),
           activeColor: const Color(0xFF0D47A1),
         ),
-        Text(title, style: const TextStyle(fontSize: 14)),
+        Text(title, style: const TextStyle(fontSize: 13, color: Colors.black)),
       ],
     );
   }
 
-  Widget _buildField(String hint, {bool isPassword = false}) {
+  Widget _buildField(
+    String hint,
+    TextEditingController controller, {
+    bool isPassword = false,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
+      style: const TextStyle(color: Colors.black, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
+        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
         filled: true,
         fillColor: const Color(0xFFF5F5F5),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 15,
-          vertical: 15,
+          vertical: 12,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
       ),

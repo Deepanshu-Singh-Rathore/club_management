@@ -10,22 +10,26 @@ from .views import (
     ApproveRegistrationView,
     RejectRegistrationView,
     NotificationListView,
-    MarkNotificationReadView
+    MarkNotificationReadView,
+    MyEventsView,
 )
 
 urlpatterns = [
     # Clubs
-    path('clubs/', ClubListCreateView.as_view(), name='club-list-create'),
-    path('clubs/<uuid:pk>/', ClubDetailView.as_view(), name='club-detail'),
-    path('clubs/<uuid:pk>/join/', ClubJoinView.as_view(), name='club-join'),
+    path('', ClubListCreateView.as_view(), name='club-list-create'),
+    path('<uuid:pk>/', ClubDetailView.as_view(), name='club-detail'),
+    path('<uuid:pk>/join/', ClubJoinView.as_view(), name='club-join'),
 
     # Events
     path('events/', EventListCreateView.as_view(), name='event-list-create'),
+    path('events/my/', MyEventsView.as_view(), name='my-events'),
     path('events/<uuid:pk>/', EventDetailView.as_view(), name='event-detail'),
-    path('events/<uuid:pk>/apply/', ApplyEventView.as_view()),
-    path('events/<uuid:pk>/approve/', ApproveRegistrationView.as_view()),
-    path('events/<uuid:pk>/pending/', PendingRegistrationsView.as_view()),
-    path('events/<uuid:pk>/reject/', RejectRegistrationView.as_view()),
-    path('notifications/', NotificationListView.as_view()),
-    path('notifications/<int:pk>/read/', MarkNotificationReadView.as_view()),
+    path('events/<uuid:pk>/apply/', ApplyEventView.as_view(), name='event-apply'),
+    path('events/<uuid:pk>/approve/', ApproveRegistrationView.as_view(), name='event-approve'),
+    path('events/<uuid:pk>/reject/', RejectRegistrationView.as_view(), name='event-reject'),
+    path('events/<uuid:pk>/pending/', PendingRegistrationsView.as_view(), name='event-pending'),
+
+    # Notifications
+    path('notifications/', NotificationListView.as_view(), name='notification-list'),
+    path('notifications/<int:pk>/read/', MarkNotificationReadView.as_view(), name='notification-read'),
 ]

@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -8,19 +11,48 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passController = TextEditingController();
-  int _userType = 0; // 0 for Student, 1 for Admin
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _loading = false;
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await context.read<AuthProvider>().login(
+            _emailCtrl.text.trim(),
+            _passCtrl.text,
+          );
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    } on ApiException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (_) {
+      if (mounted) _showError('Network error. Check your connection.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Screen dimensions nikalne ke liye
-    double screenWidth = MediaQuery.of(context).size.width;
+    final w = MediaQuery.of(context).size.width;
 
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -30,150 +62,118 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            // Scrollable taaki keyboard khulne pe error na aaye
-            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
+            padding: EdgeInsets.symmetric(horizontal: w * 0.08),
             child: Column(
               children: [
-                SizedBox(height: screenWidth * 0.1),
-
-                // Responsive Logo
+                SizedBox(height: w * 0.1),
+                // Logo
                 Container(
-                  width: screenWidth * 0.3, // Screen ka 30% width
-                  height: screenWidth * 0.3,
+                  width: w * 0.28,
+                  height: w * 0.28,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Color(0xFF0D47A1),
-                    image: DecorationImage(
-                      image: AssetImage("assets/images/logo.png"),
-                      fit: BoxFit.cover,
-                    ),
                   ),
+                  child: const Icon(Icons.school, size: 60, color: Colors.white),
                 ),
-
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Text(
-                  "ClubSphere",
+                  'ClubSphere',
                   style: TextStyle(
-                    fontSize: screenWidth * 0.08, // Dynamic font size
+                    fontSize: w * 0.08,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: screenWidth * 0.08),
+                SizedBox(height: w * 0.08),
 
-                // Responsive Card
+                // Card
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Welcome Back",
-                            style: TextStyle(
-                              fontSize: screenWidth * 0.055,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0D47A1),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Welcome Back 👋',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: w * 0.055,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0D47A1),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Email
+                        TextFormField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            hintText: 'College Email',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          validator: (v) =>
+                              v != null && v.contains('@') ? null : 'Enter a valid email',
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Password
+                        TextFormField(
+                          controller: _passCtrl,
+                          obscureText: _obscure,
+                          decoration: InputDecoration(
+                            hintText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscure
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined),
+                              onPressed: () => setState(() => _obscure = !_obscure),
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            "👋",
-                            style: TextStyle(fontSize: screenWidth * 0.06),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                          validator: (v) =>
+                              (v != null && v.length >= 6) ? null : 'Min 6 characters',
+                        ),
+                        const SizedBox(height: 22),
 
-                      _buildField("Email Address"),
-                      const SizedBox(height: 15),
-                      _buildField("Password", isPassword: true),
+                        // Login button
+                        ElevatedButton(
+                          onPressed: _loading ? null : _submit,
+                          child: _loading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Login',
+                                  style: TextStyle(
+                                      fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 14),
 
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _roleOption("Student", 0),
-                          _roleOption("Admin", 1),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1976D2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        // Sign up link
+                        TextButton(
+                          onPressed: () => Navigator.pushNamed(context, '/signup'),
                           child: const Text(
-                            "Login",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            "New here? Create Account",
+                            style: TextStyle(color: Color(0xFF1565C0)),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 15),
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/signup'),
-                        child: const Text(
-                          "New here? Create Account",
-                          style: TextStyle(color: Color(0xFF1565C0)),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _roleOption(String title, int value) {
-    return Row(
-      children: [
-        Radio(
-          value: value,
-          groupValue: _userType,
-          onChanged: (v) => setState(() => _userType = v as int),
-          activeColor: const Color(0xFF0D47A1),
-        ),
-        Text(title, style: const TextStyle(fontSize: 14)),
-      ],
-    );
-  }
-
-  Widget _buildField(String hint, {bool isPassword = false}) {
-    return TextField(
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: const Color(0xFFF5F5F5),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 15,
-          vertical: 15,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
         ),
       ),
     );

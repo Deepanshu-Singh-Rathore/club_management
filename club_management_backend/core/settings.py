@@ -5,7 +5,6 @@ Django settings for ClubSphere – College Club Management System.
 from pathlib import Path
 from datetime import timedelta
 import environ
-import os
 
 # ---------------------------------------------------------------------------
 # Base directory & environment
@@ -20,9 +19,9 @@ environ.Env.read_env(BASE_DIR / '.env')
 # ---------------------------------------------------------------------------
 # Security
 # ---------------------------------------------------------------------------
-SECRET_KEY = 'django-insecure-abc123xyz456'
+SECRET_KEY = env.str('SECRET_KEY', default='django-insecure-abc123xyz456-change-in-prod')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default='127.0.0.1,localhost,10.0.2.2')  # type: ignore[call-overload]
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -58,10 +57,8 @@ MIDDLEWARE = [
 # CORS – allow all origins in dev; restrict in production
 # ---------------------------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = DEBUG
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+_default_cors = 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173'
+CORS_ALLOWED_ORIGINS = env.str('CORS_ALLOWED_ORIGINS', default=_default_cors).split(',')
 
 ROOT_URLCONF = 'core.urls'
 
@@ -89,11 +86,11 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': env('DB_USER', default='postgres'),
-        'PASSWORD': 'chiku',
-        'HOST': env('DB_HOST', default='localhost'),
-        'PORT': env('DB_PORT', default='5432'),
+        'NAME': env.str('DB_NAME', default='club_management'),
+        'USER': env.str('DB_USER', default='postgres'),
+        'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
+        'HOST': env.str('DB_HOST', default='localhost'),
+        'PORT': env.str('DB_PORT', default='5432'),
     }
 }
 
@@ -117,6 +114,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
     ),
 }
 
@@ -124,9 +123,9 @@ REST_FRAMEWORK = {
 # SimpleJWT
 # ---------------------------------------------------------------------------
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
+    'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
@@ -138,13 +137,25 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_BACKEND = env.str('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = env.str('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='ClubSphere <noreply@clubsphere.com>')
+EMAIL_HOST_USER = env.str('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env.str('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env.str('DEFAULT_FROM_EMAIL', default='ClubSphere <noreply@clubsphere.com>')
+
+# ---------------------------------------------------------------------------
+# Twilio / WhatsApp
+# ---------------------------------------------------------------------------
+TWILIO_ACCOUNT_SID = env.str('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = env.str('TWILIO_AUTH_TOKEN', default='')
+TWILIO_WHATSAPP_FROM = env.str('TWILIO_WHATSAPP_FROM', default='whatsapp:+14155238886')
+
+# ---------------------------------------------------------------------------
+# Leaderboard – points awarded per event approval
+# ---------------------------------------------------------------------------
+EVENT_APPROVAL_POINTS = env.int('EVENT_APPROVAL_POINTS', default=10)
 
 # ---------------------------------------------------------------------------
 # Internationalisation
@@ -158,5 +169,6 @@ USE_TZ = True
 # Static files
 # ---------------------------------------------------------------------------
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

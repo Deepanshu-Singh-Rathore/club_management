@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
-import 'screens/otp_screen.dart';
-import 'screens/home_screen.dart'; // 1. Home screen import karein
+import 'screens/home_screen.dart';
+import 'screens/clubs_screen.dart';
+import 'screens/events_screen.dart';
+import 'screens/leaderboard_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/notifications_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/clubhead/create_event_screen.dart';
 
 void main() {
-  runApp(const ClubSphereApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider()..tryRestoreSession(),
+      child: const ClubSphereApp(),
+    ),
+  );
 }
 
 class ClubSphereApp extends StatelessWidget {
@@ -17,21 +31,65 @@ class ClubSphereApp extends StatelessWidget {
       title: 'ClubSphere',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: 'Segoe UI',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(
-            0xFF0D47A1,
-          ), // Darker blue seed for better theme
+          seedColor: const Color(0xFF0D47A1),
+          brightness: Brightness.light,
         ),
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0D47A1),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0D47A1),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFF5F5F5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
       ),
-      initialRoute: '/',
+      home: const _RootRouter(),
       routes: {
-        '/': (context) => const LoginScreen(),
-        '/signup': (context) => const SignupScreen(),
-        '/otp': (context) => const OtpScreen(),
-        '/home': (context) => const HomeScreen(), // 2. Home route add karein
+        '/login': (_) => const LoginScreen(),
+        '/signup': (_) => const SignupScreen(),
+        '/home': (_) => const HomeScreen(),
+        '/clubs': (_) => const ClubsScreen(),
+        '/events': (_) => const EventsScreen(),
+        '/leaderboard': (_) => const LeaderboardScreen(),
+        '/profile': (_) => const ProfileScreen(),
+        '/notifications': (_) => const NotificationsScreen(),
+        '/admin': (_) => const AdminDashboardScreen(),
+        '/clubhead/create-event': (_) => const CreateEventScreen(),
       },
     );
+  }
+}
+
+/// Decides which screen to show based on auth state.
+class _RootRouter extends StatelessWidget {
+  const _RootRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    if (auth.loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return auth.isLoggedIn ? const HomeScreen() : const LoginScreen();
   }
 }

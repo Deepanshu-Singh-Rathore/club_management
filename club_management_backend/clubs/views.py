@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -13,7 +14,6 @@ from .serializers import (
     EventRegistrationSerializer,
     NotificationSerializer,
 )
-
 from accounts.permissions import IsOwnerOrAdmin, IsClubHeadOrAdmin, IsStudent
 
 
@@ -23,10 +23,9 @@ from accounts.permissions import IsOwnerOrAdmin, IsClubHeadOrAdmin, IsStudent
 
 class ClubListCreateView(APIView):
     """
-    GET  /api/clubs/  – list all clubs (public)
-    POST /api/clubs/  – create a club (club_head or admin only)
+    GET  /api/clubs/   – list all clubs (public)
+    POST /api/clubs/   – create a club (club_head or admin only)
     """
-
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
@@ -58,7 +57,6 @@ class ClubDetailView(APIView):
         club = self.get_object(pk)
         if not club:
             return Response({'error': 'Club not found'}, status=404)
-
         return Response(ClubSerializer(club).data)
 
     def put(self, request, pk):
@@ -82,10 +80,10 @@ class ClubDetailView(APIView):
             return Response({'error': 'Club not found'}, status=404)
 
         if request.user.role != 'admin':
-            return Response({'error': 'Only admin can delete'}, status=403)
+            return Response({'error': 'Only admin can delete clubs'}, status=403)
 
         club.delete()
-        return Response({'message': 'Deleted'}, status=204)
+        return Response(status=204)
 
 
 class ClubJoinView(APIView):
@@ -97,13 +95,10 @@ class ClubJoinView(APIView):
         except Club.DoesNotExist:
             return Response({'error': 'Club not found'}, status=404)
 
-        membership, created = Membership.objects.get_or_create(
-            user=request.user,
-            club=club
-        )
+        membership, created = Membership.objects.get_or_create(user=request.user, club=club)
 
         if not created:
-            return Response({'message': 'Already joined'}, status=200)
+            return Response({'message': 'Already a member'}, status=200)
 
         return Response(MembershipSerializer(membership).data, status=201)
 
@@ -116,174 +111,205 @@ class EventListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        events = Event.objects.select_related('club', 'created_by')
+        events = Event.objects.select_related('club', 'created_by').prefetch_related('registrations')
+        club_id = request.query_params.get('club')
+        if club_id:
+            events = events.filter(club_id=club_id)
         return Response(EventSerializer(events, many=True).data)
 
     def post(self, request):
         if request.user.role not in ('club_head', 'admin'):
-            return Response({'error': 'Only club_head or admin can create event'}, status=403)
+            return Response({'error': 'Only club_head or admin can create events'}, status=403)
 
         serializer = EventCreateSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        club = serializer.validated_data.get('club')
-
-        if not club:
-            return Response({"error": "club is required"}, status=400)
-
-        event = serializer.save(
-            created_by=request.user,
-            club=club
-        )
-
+        event = serializer.save(created_by=request.user)
         return Response(EventSerializer(event).data, status=201)
 
-
-# -------------------------------------------------------------------
-# EVENT DETAIL
-# -------------------------------------------------------------------
 
 class EventDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk):
         try:
-            return Event.objects.get(pk=pk)
+            return Event.objects.select_related('club', 'created_by').get(pk=pk)
         except Event.DoesNotExist:
             return None
 
     def get(self, request, pk):
         event = self.get_object(pk)
         if not event:
-            return Response({"error": "Event not found"}, status=404)
-
+            return Response({'error': 'Event not found'}, status=404)
         return Response(EventSerializer(event).data)
 
+    def put(self, request, pk):
+        event = self.get_object(pk)
+        if not event:
+            return Response({'error': 'Event not found'}, status=404)
 
-# -------------------------------------------------------------------
-# APPLY EVENT (STUDENT)
-# -------------------------------------------------------------------
+        if request.user.role not in ('club_head', 'admin'):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        serializer = EventCreateSerializer(event, data=request.data, partial=True)
+        if serializer.is_valid():
+            event = serializer.save()
+            return Response(EventSerializer(event).data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        event = self.get_object(pk)
+        if not event:
+            return Response({'error': 'Event not found'}, status=404)
+
+        if request.user.role not in ('club_head', 'admin'):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        event.delete()
+        return Response(status=204)
+
+
+# ---------------------------------------------------------------------------
+# MY EVENTS – registrations for the authenticated user
+# ---------------------------------------------------------------------------
+
+class MyEventsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        regs = (
+            EventRegistration.objects
+            .filter(user=request.user)
+            .select_related('event__club', 'event__created_by')
+            .order_by('-created_at')
+        )
+        return Response(EventRegistrationSerializer(regs, many=True).data)
+
+
+# ---------------------------------------------------------------------------
+# APPLY FOR EVENT
+# ---------------------------------------------------------------------------
 
 class ApplyEventView(APIView):
     permission_classes = [IsAuthenticated, IsStudent]
 
     def post(self, request, pk):
-        user = request.user
-
         try:
             event = Event.objects.get(pk=pk)
         except Event.DoesNotExist:
-            return Response({"error": "Event not found"}, status=404)
+            return Response({'error': 'Event not found'}, status=404)
 
-        if EventRegistration.objects.filter(user=user, event=event).exists():
-            return Response({"message": "Already applied"}, status=400)
+        if EventRegistration.objects.filter(user=request.user, event=event).exists():
+            return Response({'message': 'Already applied'}, status=400)
 
-        approved_count = EventRegistration.objects.filter(
-            event=event,
-            status="approved"
-        ).count()
-
+        approved_count = EventRegistration.objects.filter(event=event, status='approved').count()
         if event.capacity and approved_count >= event.capacity:
-            return Response({"message": "Event full"}, status=400)
+            return Response({'message': 'Event is at full capacity'}, status=400)
 
-        EventRegistration.objects.create(
-            user=user,
-            event=event,
-            status="pending"
-        )
-        Notification.objects.create(
-            user=event.created_by,
-            message=f"{user.full_name} applied for {event.title}",
-            type="apply"
-        )
+        EventRegistration.objects.create(user=request.user, event=event, status='pending')
 
-        return Response({"message": "Applied successfully"}, status=201)
+        if event.created_by:
+            Notification.objects.create(
+                user=event.created_by,
+                message=f'{request.user.full_name or request.user.email} applied for "{event.title}"',
+                type='apply',
+            )
+
+        return Response({'message': 'Applied successfully'}, status=201)
 
 
-# -------------------------------------------------------------------
-# PENDING LIST (CLUB_HEAD / ADMIN)
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# PENDING REGISTRATIONS  (club_head / admin)
+# ---------------------------------------------------------------------------
 
 class PendingRegistrationsView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def get(self, request, pk):
-        regs = EventRegistration.objects.filter(event_id=pk, status="pending")
+        regs = (
+            EventRegistration.objects
+            .filter(event_id=pk, status='pending')
+            .select_related('user', 'event')
+        )
         return Response(EventRegistrationSerializer(regs, many=True).data)
 
 
-# -------------------------------------------------------------------
-# APPROVE
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# APPROVE REGISTRATION  (awards points)
+# ---------------------------------------------------------------------------
 
 class ApproveRegistrationView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def post(self, request, pk):
-        reg_id = request.data.get("registration_id")
-
+        reg_id = request.data.get('registration_id')
         try:
-            reg = EventRegistration.objects.get(id=reg_id, event_id=pk)
+            reg = EventRegistration.objects.select_related('user', 'event').get(
+                id=reg_id, event_id=pk
+            )
         except EventRegistration.DoesNotExist:
-            return Response({"error": "Not found"}, status=404)
+            return Response({'error': 'Registration not found'}, status=404)
 
-        approved = EventRegistration.objects.filter(
-            event_id=pk,
-            status="approved"
-        ).count()
-
+        approved = EventRegistration.objects.filter(event_id=pk, status='approved').count()
         if reg.event.capacity and approved >= reg.event.capacity:
-            return Response({"error": "Capacity full"}, status=400)
+            return Response({'error': 'Event is at full capacity'}, status=400)
 
-        reg.status = "approved"
+        reg.status = 'approved'
         reg.save()
+
+        # Award points to the student
+        points = getattr(settings, 'EVENT_APPROVAL_POINTS', 10)
+        reg.user.points += points
+        reg.user.save(update_fields=['points'])
+
         Notification.objects.create(
             user=reg.user,
-            message=f"You are approved for {reg.event.title}",
-            type="approved"
+            message=f'You have been approved for "{reg.event.title}" (+{points} pts)',
+            type='approved',
         )
 
-        return Response({"message": "Approved"})
+        return Response({'message': 'Approved', 'points_awarded': points})
 
 
-# -------------------------------------------------------------------
-# REJECT
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# REJECT REGISTRATION
+# ---------------------------------------------------------------------------
 
 class RejectRegistrationView(APIView):
     permission_classes = [IsAuthenticated, IsClubHeadOrAdmin]
 
     def post(self, request, pk):
-        reg_id = request.data.get("registration_id")
-
+        reg_id = request.data.get('registration_id')
         try:
-            reg = EventRegistration.objects.get(id=reg_id, event_id=pk)
+            reg = EventRegistration.objects.select_related('user', 'event').get(
+                id=reg_id, event_id=pk
+            )
         except EventRegistration.DoesNotExist:
-            return Response({"error": "Not found"}, status=404)
+            return Response({'error': 'Registration not found'}, status=404)
 
-        reg.status = "rejected"
+        reg.status = 'rejected'
         reg.save()
 
         Notification.objects.create(
             user=reg.user,
-            message=f"You are rejected for {reg.event.title}",
-            type="rejected"
+            message=f'Your application for "{reg.event.title}" was not accepted',
+            type='rejected',
         )
 
-        return Response({"message": "Rejected"})
+        return Response({'message': 'Rejected'})
 
+
+# ---------------------------------------------------------------------------
+# NOTIFICATIONS
+# ---------------------------------------------------------------------------
 
 class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = Notification.objects.filter(
-            user=request.user
-        ).order_by('-created_at')
-
-        return Response(NotificationSerializer(notifications, many=True).data)
+        notifs = Notification.objects.filter(user=request.user).order_by('-created_at')[:50]
+        return Response(NotificationSerializer(notifs, many=True).data)
 
 
 class MarkNotificationReadView(APIView):
@@ -293,7 +319,7 @@ class MarkNotificationReadView(APIView):
         try:
             notif = Notification.objects.get(pk=pk, user=request.user)
         except Notification.DoesNotExist:
-            return Response({"error": "Notification not found"}, status=404)
+            return Response({'error': 'Notification not found'}, status=404)
         notif.is_read = True
-        notif.save()
-        return Response({"message": "Marked as read"})
+        notif.save(update_fields=['is_read'])
+        return Response({'message': 'Marked as read'})

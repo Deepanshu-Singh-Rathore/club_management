@@ -55,17 +55,25 @@ class MembershipSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     club_name = serializers.CharField(source='club.name', read_only=True)
+    registered_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
-        fields = ('id', 'title', 'description', 'event_date', 'image_url', 'club', 'club_name', 'created_by', 'created_at')
-        read_only_fields = ('id', 'created_by', 'created_at', 'club_name')
+        fields = (
+            'id', 'title', 'description', 'event_date', 'image_url',
+            'club', 'club_name', 'capacity', 'status',
+            'registered_count', 'created_by', 'created_at',
+        )
+        read_only_fields = ('id', 'created_by', 'created_at', 'club_name', 'registered_count')
+
+    def get_registered_count(self, obj):
+        return obj.registrations.filter(status='approved').count()
 
 
 class EventCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ('title', 'description', 'event_date', 'image_url', 'club')
+        fields = ('title', 'description', 'event_date', 'image_url', 'club', 'capacity')
 
 
 # ---------------------------------------------------------------------------

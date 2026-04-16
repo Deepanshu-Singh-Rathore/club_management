@@ -66,6 +66,11 @@ class Event(models.Model):
         related_name='events',
     )
 
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.UPCOMING,
+    )
     capacity = models.IntegerField(default=0)
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

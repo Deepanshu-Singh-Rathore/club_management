@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // • Android emulator  → 10.0.2.2
 // • iOS simulator     → 127.0.0.1
 // • Real device       → your machine's LAN IP, e.g. 192.168.1.10
-const String _base = 'http://10.0.2.2:8000/api';
+const String _base = 'http://127.0.0.1:8000/api';
 
 class ApiException implements Exception {
   final int statusCode;

@@ -84,7 +84,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email: email,
         password: pass,
         rollNumber: roll,
-        role: widget.role,
       );
 
       if (data.containsKey('access')) {

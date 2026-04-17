@@ -1,18 +1,24 @@
 /**
- * Club Management WhatsApp Bot
+ * Club Management WhatsApp Bot (Twilio)
  *
- * Commands:
- *   !help          – show available commands
- *   !events        – list upcoming events
- *   !clubs         – list all clubs
- *   !status <id>   – check registration status for an event (UUID)
- *   !register <id> – apply for an event (student only)
- *   !notifications – view your latest notifications
+ * Commands (all users):
+ *   !help                – show available commands
+ *   !events              – list upcoming events
+ *   !clubs               – list all clubs
+ *   !status <id>         – check registration status for an event
+ *   !register <id>       – apply for an event
+ *   !notifications       – view your latest notifications
+ *   !login <OTP>         – login with OTP sent to your registered email
+ *
+ * Admin-only commands (requires !login first):
+ *   !poll <question>     – broadcast an event suggestion request to all members
+ *   !viewsuggestions     – view all collected poll responses
+ *   !endpoll             – close the active poll
  */
 
 require('dotenv').config();
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const express = require('express');
+const twilio = require('twilio');
 const axios = require('axios');
 
 // ---------------------------------------------------------------------------
@@ -20,12 +26,19 @@ const axios = require('axios');
 // ---------------------------------------------------------------------------
 
 const API_BASE = process.env.DJANGO_API_URL || 'http://127.0.0.1:8000/api';
-const BOT_TOKEN = process.env.BOT_API_TOKEN || '';   // service-account JWT
+const BOT_TOKEN = process.env.BOT_API_TOKEN || '';
+const ACCOUNT_SID = process.env.ACCOUNT_SID;
+const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+const PORT = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
-// Axios helper – calls the Django backend as a bot service account
+// Clients
 // ---------------------------------------------------------------------------
 
+const twilioClient = twilio(ACCOUNT_SID, AUTH_TOKEN);
+
+// Bot service-account API (admin role)
 const api = axios.create({
     baseURL: API_BASE,
     headers: {
@@ -35,46 +48,64 @@ const api = axios.create({
     timeout: 10_000,
 });
 
-// Per-user tokens stored in memory (cleared on bot restart)
-// phone → { token, refreshToken }
+// ---------------------------------------------------------------------------
+// In-memory state
+// ---------------------------------------------------------------------------
+
+// phone → { token, refreshToken, role }
 const userSessions = {};
 
-// ---------------------------------------------------------------------------
-// WhatsApp client
-// ---------------------------------------------------------------------------
+// phone → { otp }  (waiting for user to send their email)
+const pendingLogin = {};
 
-const client = new Client({
-    authStrategy: new LocalAuth({ clientId: 'club-bot' }),
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
-});
+// pollId → { question, responses: [{ phone, name, answer }], adminPhone, active }
+const activePolls = {};
+let pollCounter = 0;
 
-client.on('qr', (qr) => {
-    console.log('\n📱 Scan the QR code below with WhatsApp:\n');
-    qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', () => {
-    console.log('✅ Club Management WhatsApp Bot is ready!');
-});
-
-client.on('auth_failure', (msg) => {
-    console.error('❌ Authentication failed:', msg);
-});
-
-client.on('disconnected', (reason) => {
-    console.warn('⚠️  Bot disconnected:', reason);
-});
+// phone → pollId  (user has been sent a poll and we await their reply)
+const pendingPollResponse = {};
 
 // ---------------------------------------------------------------------------
-// Message handler
+// Express + Twilio webhook
 // ---------------------------------------------------------------------------
 
-client.on('message', async (msg) => {
-    const body = msg.body.trim();
-    const phone = msg.from; // e.g. "91XXXXXXXXXX@c.us"
+const app = express();
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+
+app.post('/webhook', (req, res) => {
+    // Acknowledge immediately with empty TwiML
+    res.set('Content-Type', 'text/xml');
+    res.send('<Response></Response>');
+
+    const from = req.body.From || '';   // "whatsapp:+91XXXXXXXXXX"
+    const body = (req.body.Body || '').trim();
+
+    handleMessage(from, body).catch(err => {
+        console.error('Unhandled error in handleMessage:', err.message);
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`✅ Club Management WhatsApp Bot listening on port ${PORT}`);
+    console.log(`   Webhook URL: POST http://localhost:${PORT}/webhook`);
+    console.log(`   Expose via ngrok: ngrok http ${PORT}`);
+});
+
+// ---------------------------------------------------------------------------
+// Core message dispatcher
+// ---------------------------------------------------------------------------
+
+async function handleMessage(from, body) {
+    // Priority 1: user has a pending poll waiting for their answer
+    if (pendingPollResponse[from] && !body.startsWith('!')) {
+        return handlePollResponse(from, body);
+    }
+
+    // Priority 2: user is in the middle of the login flow (waiting for email)
+    if (pendingLogin[from] && !body.startsWith('!')) {
+        return handleLoginEmail(from, body);
+    }
 
     if (!body.startsWith('!')) return;
 
@@ -83,66 +114,97 @@ client.on('message', async (msg) => {
     try {
         switch (cmd.toLowerCase()) {
             case '!help':
-                await msg.reply(helpText());
+                await send(from, helpText(from));
                 break;
-
             case '!events':
-                await handleEvents(msg);
+                await handleEvents(from);
                 break;
-
             case '!clubs':
-                await handleClubs(msg);
+                await handleClubs(from);
                 break;
-
             case '!status':
-                await handleStatus(msg, args[0]);
+                await handleStatus(from, args[0]);
                 break;
-
             case '!register':
-                await handleRegister(msg, phone, args[0]);
+                await handleRegister(from, args[0]);
                 break;
-
             case '!notifications':
-                await handleNotifications(msg, phone);
+                await handleNotifications(from);
                 break;
-
             case '!login':
-                await handleLogin(msg, phone, args[0]);
+                await handleLogin(from, args[0]);
                 break;
-
+            case '!poll':
+                await handlePoll(from, args.join(' '));
+                break;
+            case '!viewsuggestions':
+                await handleViewSuggestions(from);
+                break;
+            case '!endpoll':
+                await handleEndPoll(from);
+                break;
             default:
-                await msg.reply(`❓ Unknown command. Type *!help* to see available commands.`);
+                await send(from, '❓ Unknown command. Type *!help* to see available commands.');
         }
     } catch (err) {
-        console.error(`Error handling command ${cmd}:`, err.message);
-        await msg.reply('⚠️ Something went wrong. Please try again later.');
+        console.error(`Error handling "${cmd}":`, err.message);
+        await send(from, '⚠️ Something went wrong. Please try again later.');
     }
-});
-
-// ---------------------------------------------------------------------------
-// Command handlers
-// ---------------------------------------------------------------------------
-
-function helpText() {
-    return `*🎓 Club Management Bot – Commands*
-
-*!help*               – Show this message
-*!events*             – List upcoming events
-*!clubs*              – List all clubs
-*!status <event-id>*  – Check your registration status for an event
-*!register <event-id>*– Apply for an event
-*!notifications*      – View your latest notifications
-*!login <OTP>*        – Login with OTP sent to your registered email
-
-_First-time users: request an OTP from the college portal, then use !login <OTP>_`;
 }
 
-async function handleEvents(msg) {
+// ---------------------------------------------------------------------------
+// Helper: send WhatsApp message via Twilio
+// ---------------------------------------------------------------------------
+
+async function send(to, body) {
+    const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+    await twilioClient.messages.create({
+        from: TWILIO_NUMBER,
+        to: toFormatted,
+        body,
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Helper: check if logged-in user is admin
+// ---------------------------------------------------------------------------
+
+function isAdmin(phone) {
+    return userSessions[phone]?.role === 'admin';
+}
+
+// ---------------------------------------------------------------------------
+// !help
+// ---------------------------------------------------------------------------
+
+function helpText(phone) {
+    const adminSection = isAdmin(phone)
+        ? '\n\n*👑 Admin Commands:*\n*!poll <question>*       – Ask members for event suggestions\n*!viewsuggestions*      – View collected suggestions\n*!endpoll*              – Close the active poll'
+        : '';
+
+    return `*🎓 Club Management Bot – Commands*
+
+*!help*                – Show this message
+*!events*              – List upcoming events
+*!clubs*               – List all clubs
+*!status <event-id>*   – Check your registration status
+*!register <event-id>* – Apply for an event
+*!notifications*       – View your latest notifications
+*!login <OTP>*         – Login with OTP from the college portal
+
+_First-time: request an OTP at the college portal, then use !login <OTP>_${adminSection}`;
+}
+
+// ---------------------------------------------------------------------------
+// !events
+// ---------------------------------------------------------------------------
+
+async function handleEvents(phone) {
     const res = await api.get('/clubs/events/');
     const events = res.data;
 
     if (!events.length) {
-        return msg.reply('📅 No upcoming events at the moment.');
+        return send(phone, '📅 No upcoming events at the moment.');
     }
 
     const lines = events.slice(0, 10).map((e, i) => {
@@ -152,69 +214,78 @@ async function handleEvents(msg) {
         return `*${i + 1}. ${e.title}*\n   🏛 ${e.club_name}\n   📅 ${date}\n   🆔 \`${e.id}\``;
     });
 
-    await msg.reply(`*📋 Upcoming Events:*\n\n${lines.join('\n\n')}\n\nUse *!register <event-id>* to apply.`);
+    await send(phone, `*📋 Upcoming Events:*\n\n${lines.join('\n\n')}\n\nUse *!register <event-id>* to apply.`);
 }
 
-async function handleClubs(msg) {
+// ---------------------------------------------------------------------------
+// !clubs
+// ---------------------------------------------------------------------------
+
+async function handleClubs(phone) {
     const res = await api.get('/clubs/');
     const clubs = res.data;
 
     if (!clubs.length) {
-        return msg.reply('🏛 No clubs found.');
+        return send(phone, '🏛 No clubs found.');
     }
 
     const lines = clubs.slice(0, 15).map((c, i) =>
         `*${i + 1}. ${c.name}*\n   👥 ${c.member_count} members`
     );
 
-    await msg.reply(`*🏛 All Clubs:*\n\n${lines.join('\n\n')}`);
+    await send(phone, `*🏛 All Clubs:*\n\n${lines.join('\n\n')}`);
 }
 
-async function handleStatus(msg, eventId) {
+// ---------------------------------------------------------------------------
+// !status <eventId>
+// ---------------------------------------------------------------------------
+
+async function handleStatus(phone, eventId) {
     if (!eventId) {
-        return msg.reply('❗ Please provide an event ID.\nUsage: *!status <event-id>*');
+        return send(phone, '❗ Please provide an event ID.\nUsage: *!status <event-id>*');
     }
 
-    const phone = msg.from;
     const token = userSessions[phone]?.token;
     if (!token) {
-        return msg.reply('🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
+        return send(phone, '🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
     }
 
     try {
-        const res = await axios.get(`${API_BASE}/clubs/events/${eventId}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        const event = res.data;
+        const [eventRes, regRes] = await Promise.all([
+            axios.get(`${API_BASE}/clubs/events/${eventId}/`, { headers: { Authorization: `Bearer ${token}` } }),
+            axios.get(`${API_BASE}/clubs/events/${eventId}/pending/`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
 
-        // Check the user's own registration
-        const regRes = await axios.get(`${API_BASE}/clubs/events/${eventId}/registrations/pending/`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        const event = eventRes.data;
+        const isPending = regRes.data.length > 0;
 
-        await msg.reply(
+        await send(phone,
             `*📋 Event: ${event.title}*\n` +
             `🏛 Club: ${event.club_name}\n` +
             `📅 Date: ${new Date(event.event_date).toLocaleDateString('en-IN')}\n\n` +
-            `Your registration is currently shown in pending list: ${regRes.data.length > 0 ? 'Yes (pending)' : 'Approved / Not registered'}`
+            `Your status: ${isPending ? '⏳ Pending approval' : '✅ Approved / Not registered'}`
         );
     } catch (err) {
         if (err.response?.status === 404) {
-            await msg.reply('❌ Event not found. Please check the event ID.');
+            await send(phone, '❌ Event not found. Please check the event ID.');
         } else {
             throw err;
         }
     }
 }
 
-async function handleRegister(msg, phone, eventId) {
+// ---------------------------------------------------------------------------
+// !register <eventId>
+// ---------------------------------------------------------------------------
+
+async function handleRegister(phone, eventId) {
     if (!eventId) {
-        return msg.reply('❗ Please provide an event ID.\nUsage: *!register <event-id>*');
+        return send(phone, '❗ Please provide an event ID.\nUsage: *!register <event-id>*');
     }
 
     const token = userSessions[phone]?.token;
     if (!token) {
-        return msg.reply('🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
+        return send(phone, '🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
     }
 
     try {
@@ -223,23 +294,27 @@ async function handleRegister(msg, phone, eventId) {
             {},
             { headers: { Authorization: `Bearer ${token}` } }
         );
-        await msg.reply('✅ Registration submitted successfully! You will be notified once approved.');
+        await send(phone, '✅ Registration submitted! You will be notified once approved.');
     } catch (err) {
         const detail = err.response?.data?.message || err.response?.data?.error;
         if (detail) {
-            await msg.reply(`⚠️ ${detail}`);
+            await send(phone, `⚠️ ${detail}`);
         } else if (err.response?.status === 403) {
-            await msg.reply('🚫 Only students can register for events.');
+            await send(phone, '🚫 Only students can register for events.');
         } else {
             throw err;
         }
     }
 }
 
-async function handleNotifications(msg, phone) {
+// ---------------------------------------------------------------------------
+// !notifications
+// ---------------------------------------------------------------------------
+
+async function handleNotifications(phone) {
     const token = userSessions[phone]?.token;
     if (!token) {
-        return msg.reply('🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
+        return send(phone, '🔒 You need to login first.\nRequest an OTP from the college portal, then use *!login <OTP>*');
     }
 
     const res = await axios.get(`${API_BASE}/clubs/notifications/`, {
@@ -248,39 +323,34 @@ async function handleNotifications(msg, phone) {
     const notifs = res.data;
 
     if (!notifs.length) {
-        return msg.reply('🔔 No notifications yet.');
+        return send(phone, '🔔 No notifications yet.');
     }
 
     const lines = notifs.slice(0, 10).map((n) => {
         const icon = n.type === 'approved' ? '✅' : n.type === 'rejected' ? '❌' : '📩';
-        const read = n.is_read ? '' : ' 🔵';
-        return `${icon}${read} ${n.message}`;
+        const dot = n.is_read ? '' : ' 🔵';
+        return `${icon}${dot} ${n.message}`;
     });
 
-    await msg.reply(`*🔔 Your Notifications:*\n\n${lines.join('\n')}`);
+    await send(phone, `*🔔 Your Notifications:*\n\n${lines.join('\n')}`);
 }
 
-/**
- * !login <OTP>  – exchange a portal OTP for a JWT and store it in the session.
- * The user must have already requested an OTP from the college portal via their
- * registered email address. The bot then calls the VerifyOTP endpoint.
- */
-async function handleLogin(msg, phone, otp) {
+// ---------------------------------------------------------------------------
+// !login <OTP>  →  then awaits email reply
+// ---------------------------------------------------------------------------
+
+async function handleLogin(phone, otp) {
     if (!otp) {
-        return msg.reply('❗ Please provide your OTP.\nUsage: *!login <OTP>*\n\nRequest your OTP at the college portal first.');
+        return send(phone, '❗ Please provide your OTP.\nUsage: *!login <OTP>*\n\nRequest your OTP at the college portal first.');
     }
 
-    // We need the user's email to verify the OTP. Ask them to send it separately.
-    // To keep it simple, we store a pending-login state.
-    if (!pendingLogin[phone]) {
-        pendingLogin[phone] = { otp };
-        return msg.reply(
-            '📧 Got your OTP! Now please reply with your *college email address* to complete login.\n\nExample: `student@college.edu`'
-        );
-    }
+    pendingLogin[phone] = { otp };
+    await send(phone,
+        '📧 Got your OTP! Now please reply with your *college email address* to complete login.\n\nExample: student@college.edu'
+    );
+}
 
-    // If we already have a pending entry with otp, this message is the email
-    const email = msg.body.trim();
+async function handleLoginEmail(phone, email) {
     const storedOtp = pendingLogin[phone]?.otp;
     delete pendingLogin[phone];
 
@@ -290,56 +360,208 @@ async function handleLogin(msg, phone, otp) {
             otp_code: storedOtp,
         });
 
+        const user = res.data.user;
         userSessions[phone] = {
             token: res.data.access,
             refreshToken: res.data.refresh,
+            role: user?.role || 'student',
         };
 
-        await msg.reply(`✅ Login successful! Welcome, *${res.data.user?.full_name || email}*\n\nYou can now use *!events*, *!register*, and *!notifications*.`);
+        const adminNote = user?.role === 'admin' ? '\n\n👑 Admin commands unlocked. Type *!help* to see them.' : '';
+        await send(phone, `✅ Login successful! Welcome, *${user?.full_name || email}*${adminNote}`);
     } catch (err) {
         const detail = err.response?.data?.error || err.response?.data?.detail;
-        await msg.reply(`❌ Login failed: ${detail || 'Invalid OTP or email.'}\n\nRequest a new OTP from the college portal and try *!login <OTP>* again.`);
+        await send(phone, `❌ Login failed: ${detail || 'Invalid OTP or email.'}\n\nRequest a new OTP and try *!login <OTP>* again.`);
     }
 }
 
-// Stores { phone: { otp } } while waiting for the email reply
-const pendingLogin = {};
-
 // ---------------------------------------------------------------------------
-// Override message handler to also catch email replies for pending logins
+// !poll <question>  (admin only)
 // ---------------------------------------------------------------------------
 
-client.on('message', async (msg) => {
-    const phone = msg.from;
-    const body = msg.body.trim();
+async function handlePoll(phone, question) {
+    if (!userSessions[phone]?.token) {
+        return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
+    }
+    if (!isAdmin(phone)) {
+        return send(phone, '🚫 Only admins can send polls.');
+    }
+    if (!question) {
+        return send(phone, '❗ Please provide a question.\nUsage: *!poll What kind of events do you want next semester?*');
+    }
 
-    // If this user has a pending login waiting for their email
-    if (pendingLogin[phone] && !body.startsWith('!')) {
-        const email = body;
-        const storedOtp = pendingLogin[phone].otp;
-        delete pendingLogin[phone];
+    // Check for already-active poll
+    const existing = Object.values(activePolls).find(p => p.active);
+    if (existing) {
+        return send(phone,
+            `⚠️ There is already an active poll:\n\n"${existing.question}"\n\nClose it first with *!endpoll* before starting a new one.`
+        );
+    }
 
+    // Fetch all users with phone numbers from Django
+    let members = [];
+    try {
+        const res = await api.get('/auth/admin/users/');
+        members = res.data.filter(u => u.phone_number && u.is_active);
+    } catch (err) {
+        console.error('Failed to fetch users for poll:', err.message);
+        return send(phone, '⚠️ Could not fetch member list. Make sure BOT_API_TOKEN has admin role.');
+    }
+
+    if (!members.length) {
+        return send(phone, '⚠️ No members with registered phone numbers found.');
+    }
+
+    pollCounter += 1;
+    const pollId = `poll_${pollCounter}`;
+    activePolls[pollId] = {
+        question,
+        responses: [],
+        adminPhone: phone,
+        active: true,
+        createdAt: new Date().toISOString(),
+    };
+
+    // Send poll message to each member
+    const pollMessage =
+        `📊 *Event Suggestion Request*\n\n` +
+        `The admin wants to know:\n_"${question}"_\n\n` +
+        `Please reply with your suggestion! Your response will be sent to the admin.\n` +
+        `_(Just type your reply — no need for any command prefix)_`;
+
+    let sent = 0;
+    for (const member of members) {
+        const memberPhone = normalizePhone(member.phone_number);
+        if (!memberPhone) continue;
         try {
-            const res = await axios.post(`${API_BASE}/auth/verify-otp/`, {
-                email,
-                otp_code: storedOtp,
-            });
-
-            userSessions[phone] = {
-                token: res.data.access,
-                refreshToken: res.data.refresh,
-            };
-
-            await msg.reply(`✅ Login successful! Welcome, *${res.data.user?.full_name || email}*\n\nYou can now use *!events*, *!register*, and *!notifications*.`);
+            await send(memberPhone, pollMessage);
+            pendingPollResponse[memberPhone] = pollId;
+            sent++;
         } catch (err) {
-            const detail = err.response?.data?.error || err.response?.data?.detail;
-            await msg.reply(`❌ Login failed: ${detail || 'Invalid OTP or email.'}`);
+            console.warn(`Could not send poll to ${memberPhone}:`, err.message);
         }
     }
-});
+
+    await send(phone,
+        `✅ Poll sent to *${sent}* member(s)!\n\n` +
+        `Question: _"${question}"_\n\n` +
+        `Use *!viewsuggestions* to see responses as they come in.\n` +
+        `Use *!endpoll* to close the poll.`
+    );
+}
 
 // ---------------------------------------------------------------------------
-// Start
+// Poll response handler (called when a user replies without a ! command)
 // ---------------------------------------------------------------------------
 
-client.initialize();
+async function handlePollResponse(phone, answer) {
+    const pollId = pendingPollResponse[phone];
+    delete pendingPollResponse[phone];
+
+    const poll = activePolls[pollId];
+    if (!poll || !poll.active) {
+        return; // Poll ended before reply arrived
+    }
+
+    // Try to get the user's name from their session, else use phone
+    const name = userSessions[phone]
+        ? `Logged-in user (${phone})`
+        : phone;
+
+    poll.responses.push({ phone, name, answer, at: new Date().toISOString() });
+
+    await send(phone, '✅ Thank you! Your suggestion has been recorded and sent to the admin.');
+
+    // Notify admin of new response
+    try {
+        await send(poll.adminPhone,
+            `📩 *New suggestion received!*\n\nFrom: ${phone}\nSuggestion: _"${answer}"_\n\n` +
+            `Total responses so far: ${poll.responses.length}\nUse *!viewsuggestions* to see all.`
+        );
+    } catch (err) {
+        console.warn('Could not notify admin of poll response:', err.message);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// !viewsuggestions  (admin only)
+// ---------------------------------------------------------------------------
+
+async function handleViewSuggestions(phone) {
+    if (!userSessions[phone]?.token) {
+        return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
+    }
+    if (!isAdmin(phone)) {
+        return send(phone, '🚫 Only admins can view suggestions.');
+    }
+
+    const polls = Object.values(activePolls);
+    if (!polls.length) {
+        return send(phone, '📊 No polls have been created yet. Use *!poll <question>* to start one.');
+    }
+
+    const lines = [];
+    for (const poll of polls) {
+        const status = poll.active ? '🟢 Active' : '🔴 Closed';
+        lines.push(`*${status}* – "${poll.question}"\n📅 ${new Date(poll.createdAt).toLocaleString('en-IN')}\n📬 ${poll.responses.length} response(s)`);
+
+        if (poll.responses.length) {
+            poll.responses.forEach((r, i) => {
+                lines.push(`  ${i + 1}. ${r.answer}  _(${r.phone})_`);
+            });
+        } else {
+            lines.push('  _(No responses yet)_');
+        }
+    }
+
+    await send(phone, `*📊 Event Suggestion Poll Results:*\n\n${lines.join('\n\n')}`);
+}
+
+// ---------------------------------------------------------------------------
+// !endpoll  (admin only)
+// ---------------------------------------------------------------------------
+
+async function handleEndPoll(phone) {
+    if (!userSessions[phone]?.token) {
+        return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
+    }
+    if (!isAdmin(phone)) {
+        return send(phone, '🚫 Only admins can close polls.');
+    }
+
+    const poll = Object.values(activePolls).find(p => p.active);
+    if (!poll) {
+        return send(phone, '⚠️ No active poll to close.');
+    }
+
+    poll.active = false;
+
+    // Clear any pending responses from members who haven't replied yet
+    for (const [memberPhone, pId] of Object.entries(pendingPollResponse)) {
+        if (activePolls[pId] === poll) {
+            delete pendingPollResponse[memberPhone];
+            try {
+                await send(memberPhone, '📊 The event suggestion poll has been closed. Thank you!');
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    await send(phone,
+        `🔴 Poll closed!\n\n` +
+        `Question: _"${poll.question}"_\n` +
+        `Total responses: *${poll.responses.length}*\n\n` +
+        `Use *!viewsuggestions* to see the full summary.`
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Utility: normalize phone number to whatsapp: format
+// ---------------------------------------------------------------------------
+
+function normalizePhone(phone) {
+    if (!phone) return null;
+    // Strip non-digit chars, then prepend whatsapp:+
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return null;
+    return `whatsapp:+${digits}`;
+}

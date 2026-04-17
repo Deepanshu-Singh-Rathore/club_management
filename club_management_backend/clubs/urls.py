@@ -12,6 +12,9 @@ from .views import (
     NotificationListView,
     MarkNotificationReadView,
     MyEventsView,
+    EventSuggestionPollView,
+    EventSuggestionPollDetailView,
+    EventSuggestionSubmitView,
 )
 
 urlpatterns = [
@@ -32,4 +35,10 @@ urlpatterns = [
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notification-list'),
     path('notifications/<int:pk>/read/', MarkNotificationReadView.as_view(), name='notification-read'),
+
+    # Event Suggestion Polls
+    path('polls/', EventSuggestionPollView.as_view(), name='poll-list-create'),
+    path('polls/<uuid:pk>/', EventSuggestionPollDetailView.as_view(), name='poll-detail'),
+    path('polls/<uuid:pk>/close/', EventSuggestionPollDetailView.as_view(), name='poll-close'),
+    path('polls/<uuid:pk>/suggest/', EventSuggestionSubmitView.as_view(), name='poll-suggest'),
 ]

@@ -104,6 +104,41 @@ class EventRegistration(models.Model):
     class Meta:
         unique_together = ('user', 'event')
 
+# ---------------------------------------------------------------------------
+# EVENT SUGGESTION POLL
+# ---------------------------------------------------------------------------
+
+class EventSuggestionPoll(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    question = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='polls_created')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'event_suggestion_polls'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Poll: {self.question[:60]}"
+
+
+class EventSuggestion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    poll = models.ForeignKey(EventSuggestionPoll, on_delete=models.CASCADE, related_name='suggestions')
+    submitter_phone = models.CharField(max_length=30)
+    suggestion = models.TextField()
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'event_suggestions'
+        ordering = ['submitted_at']
+
+    def __str__(self):
+        return f"{self.submitter_phone}: {self.suggestion[:60]}"
+
+
 class Notification(models.Model):
     TYPE_CHOICES = (
         ("apply", "Apply"),

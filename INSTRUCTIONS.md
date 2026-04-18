@@ -213,3 +213,42 @@ flutter run -d chrome
 **Port 8000 already in use**
 > Run on a different port: `python manage.py runserver 8001`
 > Then update `lib/services/api_service.dart` line 9: change `8000` to `8001`.
+
+---
+
+## 6. WhatsApp Bot Quick Start
+
+Use this when you want to start the bot manually later.
+
+### 6a. Start the Django backend
+
+Open one terminal and run:
+
+```
+cd club_management_backend
+venv\Scripts\activate
+python manage.py runserver
+```
+
+### 6b. Start the bot
+
+Open a second terminal and run:
+
+```
+cd whatsapp_bot
+npm start
+```
+
+Make sure `.env` in `whatsapp_bot` still points to the correct Django API URL and JWT token.
+
+### 6c. If you are testing WhatsApp sandbox delivery
+
+1. Start ngrok on the bot port:
+
+```
+ngrok http 3000
+```
+
+2. Copy the ngrok HTTPS URL and set it as the Twilio sandbox webhook for `/webhook`.
+3. From your WhatsApp account, join the Twilio sandbox using the code shown in the Twilio Console.
+4. Send `!events` or `!clubs` to confirm the bot is responding.

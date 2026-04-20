@@ -104,12 +104,50 @@ class ClubJoinView(APIView):
         return Response(MembershipSerializer(membership).data, status=201)
 
 
+class ClubMembersView(APIView):
+    """
+    GET /api/clubs/<id>/members/  – list members for a specific club
+    Access: admin or the club head who created the club
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            club = Club.objects.select_related('created_by').get(pk=pk)
+        except Club.DoesNotExist:
+            return Response({'error': 'Club not found'}, status=404)
+
+        is_admin = request.user.role == 'admin'
+        is_owner_head = request.user.role == 'club_head' and club.created_by == request.user
+        if not (is_admin or is_owner_head):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        memberships = Membership.objects.filter(club=club).select_related('user')
+        members = [
+            {
+                'id': str(m.user.id),
+                'full_name': m.user.full_name,
+                'email': m.user.email,
+                'phone_number': m.user.phone_number,
+                'role': m.user.role,
+            }
+            for m in memberships
+        ]
+
+        return Response({
+            'club_id': str(club.id),
+            'club_name': club.name,
+            'member_count': len(members),
+            'members': members,
+        })
+
+
 # ---------------------------------------------------------------------------
 # EVENT VIEWS
 # ---------------------------------------------------------------------------
 
 class EventListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         events = Event.objects.select_related('club', 'created_by').prefetch_related('registrations')
@@ -348,10 +386,10 @@ class EventSuggestionPollView(APIView):
                 'is_active': p.is_active,
                 'created_at': p.created_at,
                 'closed_at': p.closed_at,
-                'response_count': p.suggestions.count(),
+                'response_count': EventSuggestion.objects.filter(poll=p).count(),
                 'suggestions': [
                     {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
-                    for s in p.suggestions.all()
+                    for s in EventSuggestion.objects.filter(poll=p)
                 ],
             }
             for p in polls
@@ -399,7 +437,7 @@ class EventSuggestionPollDetailView(APIView):
             'closed_at': poll.closed_at,
             'suggestions': [
                 {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
-                for s in poll.suggestions.all()
+                for s in EventSuggestion.objects.filter(poll=poll)
             ],
         }
         return Response(data)

@@ -159,6 +159,22 @@ BOT_API_TOKEN=<service-account-JWT>
 npm start   # Scan QR code with WhatsApp
 ```
 
+#### Create the JWT for the bot
+
+The bot needs a JWT from a Django user with the `admin` role.
+
+Use this request after the backend is running:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+    -H "Content-Type: application/json" \
+    -d '{"email": "your_admin_email@example.com", "password": "your_password"}'
+```
+
+On Windows PowerShell, use `curl.exe` or `Invoke-RestMethod` if plain `curl` is aliased.
+
+Copy the `access` token from the response into `BOT_API_TOKEN` in `whatsapp_bot/.env`.
+
 ---
 
 ## 🌐 Deployment

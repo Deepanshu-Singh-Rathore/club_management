@@ -14,6 +14,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _rollCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
@@ -23,6 +24,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _phoneCtrl.dispose();
     _rollCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -37,6 +39,7 @@ class _SignupScreenState extends State<SignupScreen> {
             email: _emailCtrl.text.trim(),
             password: _passCtrl.text,
             rollNumber: _rollCtrl.text.trim(),
+            phoneNumber: _phoneCtrl.text.trim(),
           );
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } on ApiException catch (e) {
@@ -102,6 +105,17 @@ class _SignupScreenState extends State<SignupScreen> {
                             validator: (v) => v != null && v.contains('@')
                                 ? null
                                 : 'Enter valid email'),
+                        const SizedBox(height: 12),
+                        _field(_phoneCtrl, 'WhatsApp Phone Number (with country code)',
+                            Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) {
+                          if (v == null || v.isEmpty) return 'Phone number is required';
+                          if (!RegExp(r'^\+?[0-9]{7,15}$').hasMatch(v)) {
+                            return 'Enter a valid phone number';
+                          }
+                          return null;
+                        }),
                         const SizedBox(height: 12),
                         _field(_rollCtrl, 'Roll Number (optional)',
                             Icons.badge_outlined),

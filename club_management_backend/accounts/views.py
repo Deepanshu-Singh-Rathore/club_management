@@ -1,5 +1,6 @@
 import random
 import string
+from typing import cast
 from django.utils import timezone
 from datetime import timedelta
 from django.core.mail import send_mail
@@ -46,8 +47,12 @@ class RequestOTPView(APIView):
         serializer = RequestOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data['email']
-        user, _ = User.objects.get_or_create(email=email, defaults={'full_name': ''})
+        validated_data = cast(dict[str, str], serializer.validated_data)
+        email = validated_data['email']
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'No account found with this email'}, status=400)
 
         OTPVerification.objects.filter(user=user, is_used=False).update(is_used=True)
 
@@ -75,8 +80,9 @@ class VerifyOTPView(APIView):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data['email']
-        otp_code = serializer.validated_data['otp']
+        validated_data = cast(dict[str, str], serializer.validated_data)
+        email = validated_data['email']
+        otp_code = validated_data['otp']
 
         try:
             user = User.objects.get(email=email)
@@ -118,7 +124,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        user = serializer.save()
+        user = cast(User, serializer.save())
         tokens = get_tokens_for_user(user)
         return Response(
             {**tokens, 'user': UserSerializer(user).data},
@@ -134,8 +140,9 @@ class LoginView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data['email']
-        password = serializer.validated_data['password']
+        validated_data = cast(dict[str, str], serializer.validated_data)
+        email = validated_data['email']
+        password = validated_data['password']
 
         try:
             user = User.objects.get(email=email)

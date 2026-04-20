@@ -113,12 +113,14 @@ class ApiService {
     required String email,
     required String password,
     String rollNumber = '',
+    String phoneNumber = '',
   }) async {
     return await post('/auth/register/', {
       'full_name': fullName,
       'email': email,
       'password': password,
       'roll_number': rollNumber,
+      'phone_number': phoneNumber,
       'role': 'student',
     }, auth: false) as Map<String, dynamic>;
   }

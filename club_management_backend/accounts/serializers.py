@@ -23,6 +23,7 @@ class RegisterSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     email = serializers.EmailField()
     password = serializers.CharField(min_length=6, write_only=True)
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
     roll_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=['student', 'admin'], default='student')
 
@@ -38,11 +39,13 @@ class RegisterSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         roll_number = validated_data.pop('roll_number', None) or None
+        phone_number = validated_data.pop('phone_number', None) or None
         return User.objects.create_user(
             email=validated_data['email'],
             full_name=validated_data['full_name'],
             password=validated_data['password'],
             roll_number=roll_number,
+            phone_number=phone_number,
             role=validated_data.get('role', 'student'),
             is_verified=True,
         )

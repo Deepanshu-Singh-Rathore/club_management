@@ -53,7 +53,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     full_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True, db_index=True)
     roll_number = models.CharField(max_length=30, blank=True, null=True, unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
     points = models.PositiveIntegerField(default=0)

@@ -88,13 +88,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 # ------------------------------------------------------------------------------
-# Database (PostgreSQL)
+# Database
 # ------------------------------------------------------------------------------
+# Expect a full database URL in `DB_URL` (e.g. provided by Neon). This
+# project keeps a `.env.example` with a `DB_URL` value — copy that to `.env`.
+# Calling `env.db('DB_URL')` will raise if the variable is missing, so we
+# avoid silently falling back to sqlite.
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": env.db("DB_URL")
 }
 
 # ------------------------------------------------------------------------------

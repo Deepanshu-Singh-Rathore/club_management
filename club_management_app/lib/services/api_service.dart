@@ -1,12 +1,21 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
-// • Android emulator  → 10.0.2.2
-// • iOS simulator     → 127.0.0.1
-// • Real device       → your machine's LAN IP, e.g. 192.168.1.10
-const String _base = 'http://10.0.2.2:8000/api';
+// Auto-select backend host:
+// - Android emulator => 10.0.2.2
+// - iOS simulator    => 127.0.0.1
+// - Real device      => set `_machineIp` below
+const String _machineIp = '127.0.0.1'; // change if testing on a real device
+final String _base = (() {
+  try {
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000/api';
+    if (Platform.isIOS) return 'http://127.0.0.1:8000/api';
+  } catch (_) {}
+  return 'http://$_machineIp:8000/api';
+})();
 
 class ApiException implements Exception {
   final int statusCode;

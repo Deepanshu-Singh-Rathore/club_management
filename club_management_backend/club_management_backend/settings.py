@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,6 +38,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts',
+    'clubs',
+    'core',
+    'events',
 ]
 
 MIDDLEWARE = [
@@ -69,13 +75,20 @@ WSGI_APPLICATION = 'club_management_backend.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# Use `DB_URL` from environment (Neon/Postgres URL). Falls back to a local sqlite DB.
+env = environ.Env(
+    DEBUG=(bool, True),
+)
+# optionally read a .env file at project root
+env_file = os.path.join(BASE_DIR, '.env.example')
+if os.path.exists(env_file):
+    env.read_env(env_file)
 
+# `env.db()` will parse a database URL like the one provided by Neon.
+# It looks for the variable name provided (here: DB_URL). If not found,
+# fall back to a local sqlite file for development.
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db('DB_URL', default=f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
 }
 
 

@@ -33,6 +33,16 @@ Edit `.env`:
 - `DJANGO_API_URL` – URL of your running Django backend (default: `http://127.0.0.1:8000/api`)
 - `BOT_API_TOKEN` – JWT token for the bot's service account (create a user with `admin` role in Django admin and log in via `/api/auth/login/` to get a token)
 
+To create the token, run this after the backend is up:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+	-H "Content-Type: application/json" \
+	-d '{"email": "your_admin_email@example.com", "password": "your_password"}'
+```
+
+Use the `access` token from the response as `BOT_API_TOKEN`.
+
 ### 3. Start the bot
 
 ```bash

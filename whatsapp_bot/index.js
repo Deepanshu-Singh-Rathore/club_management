@@ -10,8 +10,8 @@
  *   !notifications       – view your latest notifications
  *   !login <OTP>         – login with OTP sent to your registered email
  *
- * Admin-only commands (requires !login first):
- *   !poll <question>     – broadcast an event suggestion request to all members
+ * Poll commands (admin / club_head, requires !login first):
+ *   !poll <club-id> <question>  – ask suggestions from one specific club
  *   !viewsuggestions     – view all collected poll responses
  *   !endpoll             – close the active poll
  */
@@ -58,7 +58,7 @@ const userSessions = {};
 // phone → { otp }  (waiting for user to send their email)
 const pendingLogin = {};
 
-// pollId → { question, responses: [{ phone, name, answer }], adminPhone, active }
+// pollId → { question, clubId, clubName, responses, ownerPhone, active }
 const activePolls = {};
 let pollCounter = 0;
 
@@ -135,7 +135,7 @@ async function handleMessage(from, body) {
                 await handleLogin(from, args[0]);
                 break;
             case '!poll':
-                await handlePoll(from, args.join(' '));
+                await handlePoll(from, args);
                 break;
             case '!viewsuggestions':
                 await handleViewSuggestions(from);
@@ -173,14 +173,23 @@ function isAdmin(phone) {
     return userSessions[phone]?.role === 'admin';
 }
 
+function canManagePolls(phone) {
+    const role = userSessions[phone]?.role;
+    return role === 'admin' || role === 'club_head';
+}
+
 // ---------------------------------------------------------------------------
 // !help
 // ---------------------------------------------------------------------------
 
 function helpText(phone) {
-    const adminSection = isAdmin(phone)
-        ? '\n\n*👑 Admin Commands:*\n*!poll <question>*       – Ask members for event suggestions\n*!viewsuggestions*      – View collected suggestions\n*!endpoll*              – Close the active poll'
+    const pollSection = canManagePolls(phone)
+        ? '\n\n*📊 Poll Commands (admin/club_head):*\n*!poll <club-id> <question>* – Ask members of a specific club\n*!viewsuggestions*          – View your poll responses\n*!endpoll*                  – Close your active poll'
         : '';
+
+    const loginHint = userSessions[phone]
+        ? ''
+        : '\n\n_First-time: request an OTP at the college portal, then use !login <OTP>_';
 
     return `*🎓 Club Management Bot – Commands*
 
@@ -192,7 +201,7 @@ function helpText(phone) {
 *!notifications*       – View your latest notifications
 *!login <OTP>*         – Login with OTP from the college portal
 
-_First-time: request an OTP at the college portal, then use !login <OTP>_${adminSection}`;
+${loginHint}${pollSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +209,9 @@ _First-time: request an OTP at the college portal, then use !login <OTP>_${admin
 // ---------------------------------------------------------------------------
 
 async function handleEvents(phone) {
-    const res = await api.get('/clubs/events/');
+    // Public endpoint: do not send the bot bearer token here, or an invalid token
+    // can trigger a 401 before DRF evaluates the read-only permission.
+    const res = await axios.get(`${API_BASE}/clubs/events/`);
     const events = res.data;
 
     if (!events.length) {
@@ -222,7 +233,8 @@ async function handleEvents(phone) {
 // ---------------------------------------------------------------------------
 
 async function handleClubs(phone) {
-    const res = await api.get('/clubs/');
+    // Public endpoint: keep this anonymous for the same reason as !events.
+    const res = await axios.get(`${API_BASE}/clubs/`);
     const clubs = res.data;
 
     if (!clubs.length) {
@@ -357,7 +369,7 @@ async function handleLoginEmail(phone, email) {
     try {
         const res = await axios.post(`${API_BASE}/auth/verify-otp/`, {
             email,
-            otp_code: storedOtp,
+            otp: storedOtp,
         });
 
         const user = res.data.user;
@@ -376,63 +388,88 @@ async function handleLoginEmail(phone, email) {
 }
 
 // ---------------------------------------------------------------------------
-// !poll <question>  (admin only)
+// !poll <club-id> <question>  (admin / club_head)
 // ---------------------------------------------------------------------------
 
-async function handlePoll(phone, question) {
+async function handlePoll(phone, args) {
     if (!userSessions[phone]?.token) {
         return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
     }
-    if (!isAdmin(phone)) {
-        return send(phone, '🚫 Only admins can send polls.');
-    }
-    if (!question) {
-        return send(phone, '❗ Please provide a question.\nUsage: *!poll What kind of events do you want next semester?*');
+    if (!canManagePolls(phone)) {
+        return send(phone, '🚫 Only admin or club head users can send polls.');
     }
 
-    // Check for already-active poll
-    const existing = Object.values(activePolls).find(p => p.active);
-    if (existing) {
+    const clubId = args[0];
+    const question = args.slice(1).join(' ').trim();
+    if (!clubId || !question) {
         return send(phone,
-            `⚠️ There is already an active poll:\n\n"${existing.question}"\n\nClose it first with *!endpoll* before starting a new one.`
+            '❗ Please provide a club ID and a question.\n' +
+            'Usage: *!poll <club-id> What events do you want this month?*\n\n' +
+            'Use *!clubs* to find club IDs.'
         );
     }
 
-    // Fetch all users with phone numbers from Django
+    // Only one active poll per owner per club in this bot instance.
+    const existing = Object.values(activePolls).find(
+        p => p.active && p.ownerPhone === phone && p.clubId === clubId
+    );
+    if (existing) {
+        return send(phone,
+            `⚠️ There is already an active poll for this club:\n\n"${existing.question}"\n\nClose it first with *!endpoll* before starting a new one.`
+        );
+    }
+
+    const token = userSessions[phone]?.token;
+    let clubName = 'Selected Club';
+
+    // Fetch only this club's members. Backend enforces admin/owner club-head access.
     let members = [];
     try {
-        const res = await api.get('/auth/admin/users/');
-        members = res.data.filter(u => u.phone_number && u.is_active);
+        const res = await axios.get(`${API_BASE}/clubs/${clubId}/members/`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        clubName = res.data.club_name || clubName;
+        members = (res.data.members || []).filter(m => m.phone_number);
     } catch (err) {
-        console.error('Failed to fetch users for poll:', err.message);
-        return send(phone, '⚠️ Could not fetch member list. Make sure BOT_API_TOKEN has admin role.');
+        const code = err.response?.status;
+        if (code === 403) {
+            return send(phone, '🚫 You do not have access to that club. Club heads can poll only their own clubs.');
+        }
+        if (code === 404) {
+            return send(phone, '❌ Club not found. Please check the club ID.');
+        }
+        console.error('Failed to fetch club members for poll:', err.message);
+        return send(phone, '⚠️ Could not fetch club members right now. Please try again.');
     }
 
     if (!members.length) {
-        return send(phone, '⚠️ No members with registered phone numbers found.');
+        return send(phone, `⚠️ No members with registered phone numbers found in *${clubName}*.`);
     }
 
     pollCounter += 1;
     const pollId = `poll_${pollCounter}`;
     activePolls[pollId] = {
+        clubId,
+        clubName,
         question,
         responses: [],
-        adminPhone: phone,
+        ownerPhone: phone,
         active: true,
         createdAt: new Date().toISOString(),
     };
 
     // Send poll message to each member
     const pollMessage =
-        `📊 *Event Suggestion Request*\n\n` +
-        `The admin wants to know:\n_"${question}"_\n\n` +
+        `📊 *${clubName} – Event Suggestion Request*\n\n` +
+        `Question:\n_"${question}"_\n\n` +
         `Please reply with your suggestion! Your response will be sent to the admin.\n` +
         `_(Just type your reply — no need for any command prefix)_`;
 
     let sent = 0;
+    const ownerPhoneNormalized = normalizePhone(phone);
     for (const member of members) {
         const memberPhone = normalizePhone(member.phone_number);
-        if (!memberPhone) continue;
+        if (!memberPhone || memberPhone === ownerPhoneNormalized) continue;
         try {
             await send(memberPhone, pollMessage);
             pendingPollResponse[memberPhone] = pollId;
@@ -443,7 +480,7 @@ async function handlePoll(phone, question) {
     }
 
     await send(phone,
-        `✅ Poll sent to *${sent}* member(s)!\n\n` +
+        `✅ Poll sent to *${sent}* member(s) in *${clubName}*!\n\n` +
         `Question: _"${question}"_\n\n` +
         `Use *!viewsuggestions* to see responses as they come in.\n` +
         `Use *!endpoll* to close the poll.`
@@ -472,38 +509,38 @@ async function handlePollResponse(phone, answer) {
 
     await send(phone, '✅ Thank you! Your suggestion has been recorded and sent to the admin.');
 
-    // Notify admin of new response
+    // Notify poll owner of new response
     try {
-        await send(poll.adminPhone,
-            `📩 *New suggestion received!*\n\nFrom: ${phone}\nSuggestion: _"${answer}"_\n\n` +
+        await send(poll.ownerPhone,
+            `📩 *New suggestion received for ${poll.clubName}!*\n\nFrom: ${phone}\nSuggestion: _"${answer}"_\n\n` +
             `Total responses so far: ${poll.responses.length}\nUse *!viewsuggestions* to see all.`
         );
     } catch (err) {
-        console.warn('Could not notify admin of poll response:', err.message);
+        console.warn('Could not notify poll owner of poll response:', err.message);
     }
 }
 
 // ---------------------------------------------------------------------------
-// !viewsuggestions  (admin only)
+// !viewsuggestions  (admin / club_head)
 // ---------------------------------------------------------------------------
 
 async function handleViewSuggestions(phone) {
     if (!userSessions[phone]?.token) {
         return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
     }
-    if (!isAdmin(phone)) {
-        return send(phone, '🚫 Only admins can view suggestions.');
+    if (!canManagePolls(phone)) {
+        return send(phone, '🚫 Only admin or club head users can view suggestions.');
     }
 
-    const polls = Object.values(activePolls);
+    const polls = Object.values(activePolls).filter(p => p.ownerPhone === phone);
     if (!polls.length) {
-        return send(phone, '📊 No polls have been created yet. Use *!poll <question>* to start one.');
+        return send(phone, '📊 No polls have been created yet. Use *!poll <club-id> <question>* to start one.');
     }
 
     const lines = [];
     for (const poll of polls) {
         const status = poll.active ? '🟢 Active' : '🔴 Closed';
-        lines.push(`*${status}* – "${poll.question}"\n📅 ${new Date(poll.createdAt).toLocaleString('en-IN')}\n📬 ${poll.responses.length} response(s)`);
+        lines.push(`*${status}* – ${poll.clubName}\n❓ "${poll.question}"\n📅 ${new Date(poll.createdAt).toLocaleString('en-IN')}\n📬 ${poll.responses.length} response(s)`);
 
         if (poll.responses.length) {
             poll.responses.forEach((r, i) => {
@@ -518,18 +555,18 @@ async function handleViewSuggestions(phone) {
 }
 
 // ---------------------------------------------------------------------------
-// !endpoll  (admin only)
+// !endpoll  (admin / club_head)
 // ---------------------------------------------------------------------------
 
 async function handleEndPoll(phone) {
     if (!userSessions[phone]?.token) {
         return send(phone, '🔒 You need to login first. Use *!login <OTP>*');
     }
-    if (!isAdmin(phone)) {
-        return send(phone, '🚫 Only admins can close polls.');
+    if (!canManagePolls(phone)) {
+        return send(phone, '🚫 Only admin or club head users can close polls.');
     }
 
-    const poll = Object.values(activePolls).find(p => p.active);
+    const poll = Object.values(activePolls).find(p => p.active && p.ownerPhone === phone);
     if (!poll) {
         return send(phone, '⚠️ No active poll to close.');
     }

@@ -3,6 +3,7 @@ from .views import (
     ClubListCreateView,
     ClubDetailView,
     ClubJoinView,
+    ClubMembersView,
     EventListCreateView,
     EventDetailView,
     ApplyEventView,
@@ -12,6 +13,9 @@ from .views import (
     NotificationListView,
     MarkNotificationReadView,
     MyEventsView,
+    EventSuggestionPollView,
+    EventSuggestionPollDetailView,
+    EventSuggestionSubmitView,
 )
 
 urlpatterns = [
@@ -19,6 +23,7 @@ urlpatterns = [
     path('', ClubListCreateView.as_view(), name='club-list-create'),
     path('<uuid:pk>/', ClubDetailView.as_view(), name='club-detail'),
     path('<uuid:pk>/join/', ClubJoinView.as_view(), name='club-join'),
+    path('<uuid:pk>/members/', ClubMembersView.as_view(), name='club-members'),
 
     # Events
     path('events/', EventListCreateView.as_view(), name='event-list-create'),
@@ -32,4 +37,10 @@ urlpatterns = [
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notification-list'),
     path('notifications/<int:pk>/read/', MarkNotificationReadView.as_view(), name='notification-read'),
+
+    # Event Suggestion Polls
+    path('polls/', EventSuggestionPollView.as_view(), name='poll-list-create'),
+    path('polls/<uuid:pk>/', EventSuggestionPollDetailView.as_view(), name='poll-detail'),
+    path('polls/<uuid:pk>/close/', EventSuggestionPollDetailView.as_view(), name='poll-close'),
+    path('polls/<uuid:pk>/suggest/', EventSuggestionSubmitView.as_view(), name='poll-suggest'),
 ]

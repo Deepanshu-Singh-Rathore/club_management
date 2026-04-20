@@ -67,6 +67,9 @@ whatsapp_bot/node_modules/
 whatsapp_bot/.wwebjs_auth/
 whatsapp_bot/.wwebjs_cache/
 
+# ─── Claude Code ──────────────────────────────────────────────────
+.claude/
+
 # ─── IDE / OS ─────────────────────────────────────────────────────
 .vscode/
 .idea/

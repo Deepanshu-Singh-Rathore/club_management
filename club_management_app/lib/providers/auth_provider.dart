@@ -47,12 +47,14 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     String rollNumber = '',
+    String phoneNumber = '',
   }) async {
     final data = await ApiService.register(
       fullName: fullName,
       email: email,
       password: password,
       rollNumber: rollNumber,
+      phoneNumber: phoneNumber,
     );
     await ApiService.saveTokens(
       data['access'] as String,

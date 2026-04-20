@@ -4,7 +4,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 
-from .models import Club, Membership, Event, EventRegistration, Notification
+from django.utils import timezone
+from .models import Club, Membership, Event, EventRegistration, Notification, EventSuggestionPoll, EventSuggestion
 from .serializers import (
     ClubSerializer,
     ClubCreateSerializer,
@@ -103,12 +104,50 @@ class ClubJoinView(APIView):
         return Response(MembershipSerializer(membership).data, status=201)
 
 
+class ClubMembersView(APIView):
+    """
+    GET /api/clubs/<id>/members/  – list members for a specific club
+    Access: admin or the club head who created the club
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            club = Club.objects.select_related('created_by').get(pk=pk)
+        except Club.DoesNotExist:
+            return Response({'error': 'Club not found'}, status=404)
+
+        is_admin = request.user.role == 'admin'
+        is_owner_head = request.user.role == 'club_head' and club.created_by == request.user
+        if not (is_admin or is_owner_head):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        memberships = Membership.objects.filter(club=club).select_related('user')
+        members = [
+            {
+                'id': str(m.user.id),
+                'full_name': m.user.full_name,
+                'email': m.user.email,
+                'phone_number': m.user.phone_number,
+                'role': m.user.role,
+            }
+            for m in memberships
+        ]
+
+        return Response({
+            'club_id': str(club.id),
+            'club_name': club.name,
+            'member_count': len(members),
+            'members': members,
+        })
+
+
 # ---------------------------------------------------------------------------
 # EVENT VIEWS
 # ---------------------------------------------------------------------------
 
 class EventListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         events = Event.objects.select_related('club', 'created_by').prefetch_related('registrations')
@@ -323,3 +362,116 @@ class MarkNotificationReadView(APIView):
         notif.is_read = True
         notif.save(update_fields=['is_read'])
         return Response({'message': 'Marked as read'})
+
+
+# ---------------------------------------------------------------------------
+# EVENT SUGGESTION POLLS
+# ---------------------------------------------------------------------------
+
+class EventSuggestionPollView(APIView):
+    """
+    GET  /api/clubs/polls/        – list all polls (admin only)
+    POST /api/clubs/polls/        – create a new poll (admin only)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=403)
+        polls = EventSuggestionPoll.objects.prefetch_related('suggestions').all()
+        data = [
+            {
+                'id': str(p.id),
+                'question': p.question,
+                'is_active': p.is_active,
+                'created_at': p.created_at,
+                'closed_at': p.closed_at,
+                'response_count': EventSuggestion.objects.filter(poll=p).count(),
+                'suggestions': [
+                    {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
+                    for s in EventSuggestion.objects.filter(poll=p)
+                ],
+            }
+            for p in polls
+        ]
+        return Response(data)
+
+    def post(self, request):
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=403)
+        question = request.data.get('question', '').strip()
+        if not question:
+            return Response({'error': 'question is required'}, status=400)
+        # Close any previously active poll
+        EventSuggestionPoll.objects.filter(is_active=True).update(
+            is_active=False, closed_at=timezone.now()
+        )
+        poll = EventSuggestionPoll.objects.create(question=question, created_by=request.user)
+        return Response({'id': str(poll.id), 'question': poll.question, 'is_active': poll.is_active}, status=201)
+
+
+class EventSuggestionPollDetailView(APIView):
+    """
+    GET    /api/clubs/polls/<id>/       – get poll with suggestions (admin only)
+    DELETE /api/clubs/polls/<id>/close/ – close the poll (admin only)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_poll(self, pk):
+        try:
+            return EventSuggestionPoll.objects.get(pk=pk)
+        except EventSuggestionPoll.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=403)
+        poll = self._get_poll(pk)
+        if not poll:
+            return Response({'error': 'Poll not found'}, status=404)
+        data = {
+            'id': str(poll.id),
+            'question': poll.question,
+            'is_active': poll.is_active,
+            'created_at': poll.created_at,
+            'closed_at': poll.closed_at,
+            'suggestions': [
+                {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
+                for s in EventSuggestion.objects.filter(poll=poll)
+            ],
+        }
+        return Response(data)
+
+    def post(self, request, pk):
+        """POST /api/clubs/polls/<id>/close/  – close the poll"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=403)
+        poll = self._get_poll(pk)
+        if not poll:
+            return Response({'error': 'Poll not found'}, status=404)
+        poll.is_active = False
+        poll.closed_at = timezone.now()
+        poll.save(update_fields=['is_active', 'closed_at'])
+        return Response({'message': 'Poll closed', 'id': str(poll.id)})
+
+
+class EventSuggestionSubmitView(APIView):
+    """
+    POST /api/clubs/polls/<id>/suggest/  – submit a suggestion (bot service account uses this)
+    Body: { phone: str, suggestion: str }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            poll = EventSuggestionPoll.objects.get(pk=pk, is_active=True)
+        except EventSuggestionPoll.DoesNotExist:
+            return Response({'error': 'Active poll not found'}, status=404)
+
+        phone = request.data.get('phone', '').strip()
+        suggestion = request.data.get('suggestion', '').strip()
+        if not suggestion:
+            return Response({'error': 'suggestion is required'}, status=400)
+
+        EventSuggestion.objects.create(poll=poll, submitter_phone=phone, suggestion=suggestion)
+        return Response({'message': 'Suggestion recorded'}, status=201)

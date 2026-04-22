@@ -1,78 +1,45 @@
-# ─── Python / Django ──────────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg
-*.egg-info/
-dist/
-build/
-eggs/
-parts/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-lib64/
-*.so
-
-# Virtual environments
-.venv/
-venv/
-env/
-ENV/
-
-# Django
+# Miscellaneous
+*.class
 *.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-
-# Environment variables (private repo — .env files committed directly)
-
-# ─── Flutter / Dart ───────────────────────────────────────────────
-# Flutter build outputs
-**/build/
-**/.dart_tool/
-**/.flutter-plugins
-**/.flutter-plugins-dependencies
-**/.pub-cache/
-**/.pub/
-**/pubspec.lock
-
-# iOS
-**/ios/Pods/
-**/ios/.symlinks/
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/ephemeral/
-
-# macOS
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-**/macos/Flutter/Flutter-Release.xcconfig
-**/macos/Flutter/Flutter-Debug.xcconfig
-
-# Android
-**/android/.gradle/
-**/android/local.properties
-**/android/key.properties
-**/android/app/google-services.json
-
-# ─── Node / WhatsApp Bot ──────────────────────────────────────────
-whatsapp_bot/node_modules/
-whatsapp_bot/.wwebjs_auth/
-whatsapp_bot/.wwebjs_cache/
-
-# ─── Claude Code ──────────────────────────────────────────────────
-.claude/
-
-# ─── IDE / OS ─────────────────────────────────────────────────────
-.vscode/
-.idea/
+*.pyc
 *.swp
-*.swo
 .DS_Store
-Thumbs.db
-desktop.ini
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release

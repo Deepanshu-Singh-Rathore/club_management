@@ -1,3 +1,4 @@
+
 # ClubSphere – College Club Management System
 
 Full-stack system: **Django REST** backend + **Flutter** mobile frontend + **WhatsApp bot**.
@@ -220,3 +221,27 @@ See `club_management_backend/.env.example`.
 | `TWILIO_WHATSAPP_FROM` | Sandbox number (`whatsapp:+14155238886`) |
 | `EVENT_APPROVAL_POINTS` | Points per approval (default 10) |
 | `EMAIL_HOST_USER / EMAIL_HOST_PASSWORD` | SMTP for OTP emails |
+=======
+# test
+
+A new Flutter project.
+
+## Getting Started
+
+This project is a starting point for a Flutter application.
+
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
+
+
+## My Contribution (Tamanna regar)
+- **Login Screen:** Created a card-based UI with school icon and input fields.
+- **Home Screen:** Added a Dashboard with Club cards and Bottom Navigation Bar.
+- **Navigation:** Successfully connected Login button to the Home Screen.
+>>>>>>> 4b870e1 (Initial commit: ClubSphere UI and Navigation)

@@ -55,12 +55,10 @@ STUDENTS = [
 ]
 
 CLUB_HEADS = [
-    ("Rahul Kapoor", "rahul.kapoor@college.edu", "HEAD001"),
-    ("Meera Nambiar", "meera.nambiar@college.edu", "HEAD002"),
-    ("Dev Anand", "dev.anand@college.edu", "HEAD003"),
-    ("Pooja Saxena", "pooja.saxena@college.edu", "HEAD004"),
-    ("Vikram Tiwari", "vikram.tiwari@college.edu", "HEAD005"),
-    ("Ishita Das", "ishita.das@college.edu", "HEAD006"),
+    ("Deepanshu Singh Rathore", "deepanshu052005@gmail.com", "HEAD001"),
+    ("Taniya Joshi", "jtaniya5@gmail.com", "HEAD002"),
+    ("Vinnet Vyas", "Vinnetvyas@gmail.com", "HEAD003"),
+    ("Tamanna Regar", "tamanna@gmail.com", "HEAD004"),
 ]
 
 EVENTS = [

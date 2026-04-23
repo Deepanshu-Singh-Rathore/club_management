@@ -30,9 +30,7 @@ db.sqlite3
 db.sqlite3-journal
 media/
 
-# Environment variables – NEVER commit real credentials
-.env
-!.env.example
+# Environment variables (private repo — .env files committed directly)
 
 # ─── Flutter / Dart ───────────────────────────────────────────────
 # Flutter build outputs

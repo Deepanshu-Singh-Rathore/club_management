@@ -81,17 +81,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ---------------------------------------------------------------------------
-# Database – PostgreSQL via environment variables
+# Database – single DB_URL connection string
 # ---------------------------------------------------------------------------
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.str('DB_NAME', default='club_management'),
-        'USER': env.str('DB_USER', default='postgres'),
-        'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
-        'HOST': env.str('DB_HOST', default='localhost'),
-        'PORT': env.str('DB_PORT', default='5432'),
-    }
+    'default': env.db('DB_URL'),
 }
 
 # ---------------------------------------------------------------------------

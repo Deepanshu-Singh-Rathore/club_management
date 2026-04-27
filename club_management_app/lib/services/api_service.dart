@@ -272,4 +272,18 @@ class ApiService {
   static Future<void> markNotificationRead(int id) async {
     await post('/clubs/notifications/$id/read/', {});
   }
+
+  // =========================================================================
+  // CLUB CHAT
+  // =========================================================================
+
+  static Future<List<dynamic>> getClubMessages(String clubId) async {
+    return await get('/clubs/$clubId/chat/') as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> sendClubMessage(
+      String clubId, String content) async {
+    return await post('/clubs/$clubId/chat/', {'content': content})
+        as Map<String, dynamic>;
+  }
 }

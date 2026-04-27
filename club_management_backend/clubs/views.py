@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 
 from django.utils import timezone
-from .models import Club, Membership, Event, EventRegistration, Notification, EventSuggestionPoll, EventSuggestion
+from .models import Club, Membership, Event, EventRegistration, Notification, EventSuggestionPoll, EventSuggestion, ClubMessage
 from .serializers import (
     ClubSerializer,
     ClubCreateSerializer,
@@ -14,6 +14,7 @@ from .serializers import (
     EventCreateSerializer,
     EventRegistrationSerializer,
     NotificationSerializer,
+    ClubMessageSerializer,
 )
 from accounts.permissions import IsOwnerOrAdmin, IsClubHeadOrAdmin, IsStudent
 
@@ -453,6 +454,55 @@ class EventSuggestionPollDetailView(APIView):
         poll.closed_at = timezone.now()
         poll.save(update_fields=['is_active', 'closed_at'])
         return Response({'message': 'Poll closed', 'id': str(poll.id)})
+
+
+# ---------------------------------------------------------------------------
+# CLUB CHAT
+# ---------------------------------------------------------------------------
+
+class ClubChatView(APIView):
+    """
+    GET  /api/clubs/<id>/chat/  – fetch last 100 messages (members only)
+    POST /api/clubs/<id>/chat/  – send a message (members only)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_club(self, pk):
+        try:
+            return Club.objects.get(pk=pk)
+        except Club.DoesNotExist:
+            return None
+
+    def _is_member(self, user, club):
+        if user.role in ('club_head', 'admin'):
+            return True
+        return Membership.objects.filter(user=user, club=club).exists()
+
+    def get(self, request, pk):
+        club = self._get_club(pk)
+        if not club:
+            return Response({'error': 'Club not found'}, status=404)
+        if not self._is_member(request.user, club):
+            return Response({'error': 'Members only'}, status=403)
+        messages = (
+            ClubMessage.objects
+            .filter(club=club)
+            .select_related('sender')
+            .order_by('created_at')[:100]
+        )
+        return Response(ClubMessageSerializer(messages, many=True).data)
+
+    def post(self, request, pk):
+        club = self._get_club(pk)
+        if not club:
+            return Response({'error': 'Club not found'}, status=404)
+        if not self._is_member(request.user, club):
+            return Response({'error': 'Members only'}, status=403)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'error': 'content is required'}, status=400)
+        msg = ClubMessage.objects.create(club=club, sender=request.user, content=content)
+        return Response(ClubMessageSerializer(msg).data, status=201)
 
 
 class EventSuggestionSubmitView(APIView):

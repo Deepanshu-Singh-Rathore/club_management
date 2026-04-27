@@ -177,28 +177,6 @@ class UserProfileView(APIView):
 
 
 # ---------------------------------------------------------------------------
-# Leaderboard
-# ---------------------------------------------------------------------------
-
-class LeaderboardView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        users = User.objects.filter(is_active=True).order_by('-points')[:50]
-        data = [
-            {
-                'rank': idx + 1,
-                'id': str(u.id),
-                'full_name': u.full_name or u.email.split('@')[0],
-                'points': u.points,
-                'roll_number': u.roll_number or '',
-            }
-            for idx, u in enumerate(users)
-        ]
-        return Response(data)
-
-
-# ---------------------------------------------------------------------------
 # Admin – User Management
 # ---------------------------------------------------------------------------
 

@@ -5,6 +5,7 @@ import '../models/event.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'event_detail_screen.dart';
+import 'club_chat_screen.dart';
 
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
@@ -64,7 +65,20 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.club.name)),
+      appBar: AppBar(
+        title: Text(widget.club.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Club Chat',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => ClubChatScreen(club: widget.club)),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

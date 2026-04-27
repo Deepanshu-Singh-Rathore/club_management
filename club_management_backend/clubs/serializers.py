@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from accounts.serializers import UserSerializer
-from .models import Club, Membership, Event, EventRegistration, Notification
+from .models import Club, Membership, Event, EventRegistration, Notification, ClubMessage
 
 
 # ---------------------------------------------------------------------------
@@ -99,3 +99,17 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = ('id', 'message', 'type', 'is_read', 'created_at')
         read_only_fields = ('id', 'created_at')
+
+
+# ---------------------------------------------------------------------------
+# Club Chat Serializer
+# ---------------------------------------------------------------------------
+
+class ClubMessageSerializer(serializers.ModelSerializer):
+    sender_id = serializers.CharField(source='sender.id', read_only=True)
+    sender_name = serializers.CharField(source='sender.full_name', read_only=True)
+
+    class Meta:
+        model = ClubMessage
+        fields = ('id', 'sender_id', 'sender_name', 'content', 'created_at')
+        read_only_fields = ('id', 'sender_id', 'sender_name', 'created_at')

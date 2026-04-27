@@ -139,6 +139,22 @@ class EventSuggestion(models.Model):
         return f"{self.submitter_phone}: {self.suggestion[:60]}"
 
 
+# ---------------------------------------------------------------------------
+# CLUB CHAT
+# ---------------------------------------------------------------------------
+
+class ClubMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='club_messages')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'club_messages'
+        ordering = ['created_at']
+
+
 class Notification(models.Model):
     TYPE_CHOICES = (
         ("apply", "Apply"),

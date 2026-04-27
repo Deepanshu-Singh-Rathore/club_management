@@ -6,7 +6,6 @@ from .views import (
     UserProfileView,
     RegisterView,
     LoginView,
-    LeaderboardView,
     AdminUserListView,
     AdminUserDetailView,
     AdminStatsView,
@@ -24,9 +23,6 @@ urlpatterns = [
 
     # Profile
     path('me/', UserProfileView.as_view(), name='user-profile'),
-
-    # Leaderboard
-    path('leaderboard/', LeaderboardView.as_view(), name='leaderboard'),
 
     # Admin
     path('admin/stats/', AdminStatsView.as_view(), name='admin-stats'),

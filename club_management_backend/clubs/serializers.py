@@ -95,11 +95,34 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class NotificationSerializer(serializers.ModelSerializer):
+    event_id = serializers.CharField(source='event.id', read_only=True)
+    club_id = serializers.CharField(source='club.id', read_only=True)
+    registration_id = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
-        fields = ('id', 'message', 'type', 'is_read', 'created_at')
-        read_only_fields = ('id', 'created_at')
+        fields = (
+            'id',
+            'message',
+            'type',
+            'is_read',
+            'created_at',
+            'event_id',
+            'club_id',
+            'registration_id',
+        )
 
+    def get_registration_id(self, obj):
+        if obj.type != 'apply' or obj.event is None:
+            return None
+
+        # message me applicant ka naam hai, but better pending registration event se nikalte hain
+        reg = EventRegistration.objects.filter(
+            event=obj.event,
+            status='pending'
+        ).order_by('-created_at').first()
+
+        return str(reg.id) if reg else None
 
 # ---------------------------------------------------------------------------
 # Club Chat Serializer

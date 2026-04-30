@@ -60,6 +60,7 @@ class Event(models.Model):
 
     event_date = models.DateTimeField()
     image_url = models.URLField(blank=True, null=True)
+
     club = models.ForeignKey(
         Club,
         on_delete=models.CASCADE,
@@ -71,6 +72,7 @@ class Event(models.Model):
         choices=Status.choices,
         default=Status.UPCOMING,
     )
+
     capacity = models.IntegerField(default=0)
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -96,13 +98,14 @@ class EventRegistration(models.Model):
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.PENDING   # ✅ FIX HERE
+        default=Status.PENDING
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ('user', 'event')
+
 
 # ---------------------------------------------------------------------------
 # EVENT SUGGESTION POLL
@@ -155,19 +158,25 @@ class ClubMessage(models.Model):
         ordering = ['created_at']
 
 
+# ---------------------------------------------------------------------------
+# NOTIFICATION ✅ UPDATED
+# ---------------------------------------------------------------------------
+
 class Notification(models.Model):
     TYPE_CHOICES = (
-        ("apply", "Apply"),
-        ("approved", "Approved"),
-        ("rejected", "Rejected"),
+        ('apply', 'Apply'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('event', 'Event'),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     is_read = models.BooleanField(default=False)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    # ✅ MUST be inside class
+    event = models.ForeignKey(Event, null=True, blank=True, on_delete=models.CASCADE)
+    club = models.ForeignKey(Club, null=True, blank=True, on_delete=models.CASCADE)
 
-    def __str__(self):
-        return f"{self.user} - {self.type}"
+    created_at = models.DateTimeField(auto_now_add=True)

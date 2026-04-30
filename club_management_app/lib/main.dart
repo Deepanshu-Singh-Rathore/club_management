@@ -7,11 +7,12 @@ import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
 import 'screens/events_screen.dart';
-import 'screens/leaderboard_screen.dart';
+//import 'screens/leaderboard_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
+import 'screens/event_detail_screen.dart';
 
 void main() {
   runApp(
@@ -66,11 +67,13 @@ class ClubSphereApp extends StatelessWidget {
         '/home': (_) => const HomeScreen(),
         '/clubs': (_) => const ClubsScreen(),
         '/events': (_) => const EventsScreen(),
-        '/leaderboard': (_) => const LeaderboardScreen(),
+        //'/leaderboard': (_) => const LeaderboardScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/admin': (_) => const AdminDashboardScreen(),
         '/clubhead/create-event': (_) => const CreateEventScreen(),
+        '/event-detail': (context) => const EventDetailScreen(),
+        
       },
     );
   }

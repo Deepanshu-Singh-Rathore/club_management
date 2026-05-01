@@ -82,6 +82,8 @@ class ApiService {
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
     );
+    print(res.statusCode);
+    print(res.body);
     return _decode(res);
   }
 
@@ -115,31 +117,38 @@ class ApiService {
     String rollNumber = '',
     String phoneNumber = '',
   }) async {
-    return await post('/auth/register/', {
-      'full_name': fullName,
-      'email': email,
-      'password': password,
-      'roll_number': rollNumber,
-      'phone_number': phoneNumber,
-      'role': 'student',
-    }, auth: false) as Map<String, dynamic>;
+    return await post(
+        '/auth/register/',
+        {
+          'full_name': fullName,
+          'email': email,
+          'password': password,
+          'roll_number': rollNumber,
+          'phone_number': phoneNumber,
+          'role': 'student',
+        },
+        auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    return await post('/auth/login/', {
-      'email': email,
-      'password': password,
-    }, auth: false) as Map<String, dynamic>;
+    return await post(
+        '/auth/login/',
+        {
+          'email': email,
+          'password': password,
+        },
+        auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> getMe() async {
     return await get('/auth/me/') as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> updateMe(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updateMe(
+      Map<String, dynamic> data) async {
     return await patch('/auth/me/', data) as Map<String, dynamic>;
   }
 
@@ -240,7 +249,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> applyForEvent(String eventId) async {
-    return await post('/clubs/events/$eventId/apply/', {}) as Map<String, dynamic>;
+    return await post('/clubs/events/$eventId/apply/', {})
+        as Map<String, dynamic>;
   }
 
   static Future<List<dynamic>> getPendingRegistrations(String eventId) async {

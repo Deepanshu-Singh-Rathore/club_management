@@ -19,6 +19,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   List<Event> _events = [];
   bool _loading = true;
   bool _joining = false;
+  bool _isJoined = false; // Naya variable join status track karne ke liye
 
   @override
   void initState() {
@@ -31,7 +32,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       final raw = await ApiService.getEvents(clubId: widget.club.id);
       if (mounted) {
         setState(() {
-          _events = raw.map((e) => Event.fromJson(e as Map<String, dynamic>)).toList();
+          _events = raw
+              .map((e) => Event.fromJson(e as Map<String, dynamic>))
+              .toList();
           _loading = false;
         });
       }
@@ -45,6 +48,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     try {
       await ApiService.joinClub(widget.club.id);
       if (mounted) {
+        setState(() {
+          _isJoined = true; // Button ko 'Joined' karne ke liye
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Joined ${widget.club.name}!')),
         );
@@ -82,9 +88,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Club header card
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -93,7 +99,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                   Row(children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: const Color(0xFF0D47A1).withOpacity(0.12),
+                      backgroundColor:
+                          const Color(0xFF0D47A1).withOpacity(0.12),
                       child: Text(
                         widget.club.name[0].toUpperCase(),
                         style: const TextStyle(
@@ -104,13 +111,15 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(widget.club.name,
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text('${widget.club.memberCount} members',
-                            style: const TextStyle(color: Colors.grey)),
-                      ]),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.club.name,
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text('${widget.club.memberCount} members',
+                                style: const TextStyle(color: Colors.grey)),
+                          ]),
                     ),
                   ]),
                   if (widget.club.description.isNotEmpty) ...[
@@ -123,15 +132,22 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _joining ? null : _join,
+                        // Agar join ho gaya hai toh button disable ho jayega
+                        onPressed: (_joining || _isJoined) ? null : _join,
                         icon: _joining
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.group_add),
-                        label: Text(_joining ? 'Joining…' : 'Join Club'),
+                            : Icon(_isJoined ? Icons.check : Icons.group_add),
+                        // Text 'Join Club' se 'Joined' mein badal jayega
+                        label: Text(_joining
+                            ? 'Joining…'
+                            : (_isJoined ? 'Joined' : 'Join Club')),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isJoined ? Colors.green : null,
+                        ),
                       ),
                     ),
                 ],
@@ -139,8 +155,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Events in this club
           const Text('Events',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
@@ -182,8 +196,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     final c = colors[status] ?? Colors.grey;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration:
-          BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
       child: Text(status, style: TextStyle(color: c, fontSize: 12)),
     );
   }

@@ -5,7 +5,6 @@ import '../models/event.dart';
 import '../services/api_service.dart';
 import 'events_screen.dart';
 import 'clubs_screen.dart';
-import 'leaderboard_screen.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
 
@@ -23,7 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
     const _DashboardTab(),
     const ClubsScreen(),
     const EventsScreen(),
-    const LeaderboardScreen(),
   ];
 
   @override
@@ -39,8 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen()),
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
           ),
           IconButton(
@@ -82,8 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: (auth.isAdmin || auth.isClubHead)
           ? FloatingActionButton.extended(
-              onPressed: () => Navigator.pushNamed(
-                  context, '/clubhead/create-event'),
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/clubhead/create-event'),
               icon: const Icon(Icons.add),
               label: const Text('New Event'),
             )
@@ -117,7 +114,8 @@ class _DashboardTabState extends State<_DashboardTab> {
     final futures = <Future>[ApiService.getEvents()];
     if (auth.isAdmin) futures.add(ApiService.getAdminStats());
 
-    final results = await Future.wait(futures.map((f) => f.catchError((_) => null)));
+    final results =
+        await Future.wait(futures.map((f) => f.catchError((_) => null)));
 
     if (!mounted) return;
     setState(() {
@@ -186,14 +184,14 @@ class _DashboardTabState extends State<_DashboardTab> {
             const _SectionHeader('Overview'),
             const SizedBox(height: 10),
             Row(children: [
-              _StatCard('Users', '${_stats['total_users'] ?? 0}',
-                  Icons.people, Colors.blue),
+              _StatCard('Users', '${_stats['total_users'] ?? 0}', Icons.people,
+                  Colors.blue),
               const SizedBox(width: 12),
-              _StatCard('Clubs', '${_stats['total_clubs'] ?? 0}',
-                  Icons.group, Colors.purple),
+              _StatCard('Clubs', '${_stats['total_clubs'] ?? 0}', Icons.group,
+                  Colors.purple),
               const SizedBox(width: 12),
-              _StatCard('Events', '${_stats['total_events'] ?? 0}',
-                  Icons.event, Colors.green),
+              _StatCard('Events', '${_stats['total_events'] ?? 0}', Icons.event,
+                  Colors.green),
             ]),
             const SizedBox(height: 16),
             _StatCard(
@@ -232,8 +230,8 @@ class _DashboardTabState extends State<_DashboardTab> {
           const SizedBox(height: 10),
           if (_events.isEmpty)
             const Center(
-                child:
-                    Text('No upcoming events', style: TextStyle(color: Colors.grey)))
+                child: Text('No upcoming events',
+                    style: TextStyle(color: Colors.grey)))
           else
             ..._events.map((e) => _EventTile(event: e)),
         ],
@@ -257,7 +255,8 @@ class _Chip extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 13)),
         ]),
       );
 }
@@ -298,7 +297,9 @@ class _StatCard extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ]),
     );
-    return wide ? SizedBox(width: double.infinity, child: card) : Expanded(child: card);
+    return wide
+        ? SizedBox(width: double.infinity, child: card)
+        : Expanded(child: card);
   }
 }
 
@@ -318,15 +319,14 @@ class _ActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF0D47A1).withOpacity(0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: const Color(0xFF0D47A1).withOpacity(0.2)),
+            border: Border.all(color: const Color(0xFF0D47A1).withOpacity(0.2)),
           ),
           child: Column(children: [
             Icon(icon, color: const Color(0xFF0D47A1)),
             const SizedBox(height: 6),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ]),
         ),
       );
@@ -342,8 +342,7 @@ class _EventTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
           child: const Icon(Icons.event, color: Color(0xFF0D47A1)),
@@ -365,7 +364,18 @@ class _EventTile extends StatelessWidget {
   }
 
   String _month(int m) => [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ][m];
 }

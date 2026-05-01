@@ -40,6 +40,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     try {
       await ApiService.applyForEvent(widget.event.id);
       if (mounted) {
+        // Apply dabate hi status 'pending' set hoga
         setState(() => _appliedStatus = 'pending');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Application submitted!')),
@@ -78,7 +79,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Status chip
                 Row(children: [
                   _statusChip(e.status),
                   const Spacer(),
@@ -98,8 +98,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 Row(children: [
                   const Icon(Icons.group, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
-                  Text(e.clubName,
-                      style: const TextStyle(color: Colors.grey)),
+                  Text(e.clubName, style: const TextStyle(color: Colors.grey)),
                   const SizedBox(width: 16),
                   const Icon(Icons.calendar_today,
                       size: 16, color: Colors.grey),
@@ -112,19 +111,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 const SizedBox(height: 20),
 
                 const Text('About',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(
                   e.description.isEmpty
                       ? 'No description provided.'
                       : e.description,
-                  style: const TextStyle(
-                      color: Colors.black87, height: 1.5),
+                  style: const TextStyle(color: Colors.black87, height: 1.5),
                 ),
                 const SizedBox(height: 30),
 
-                // Action button
+                // DEEPANSHU LOGIC APPLIED HERE:
                 if (auth.isStudent) ...[
                   if (_appliedStatus != null)
                     Container(
@@ -134,8 +132,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         color: _statusColor(_appliedStatus!).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: _statusColor(_appliedStatus!)
-                                .withOpacity(0.3)),
+                            color:
+                                _statusColor(_appliedStatus!).withOpacity(0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -144,7 +142,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               color: _statusColor(_appliedStatus!)),
                           const SizedBox(width: 8),
                           Text(
-                            'Application ${_appliedStatus!}',
+                            // Logic:
+                            // 1. Agar admin accept kare (approved) -> 'Applied'
+                            // 2. Agar apply kiya hai par wait hai (pending) -> 'Application pending'
+                            _appliedStatus == 'approved'
+                                ? 'Applied'
+                                : (_appliedStatus == 'pending'
+                                    ? 'Application pending'
+                                    : 'Application ${_appliedStatus!}'),
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: _statusColor(_appliedStatus!)),
@@ -167,11 +172,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white))
+                                    strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.how_to_reg),
-                        label: Text(
-                            _applying ? 'Applying…' : 'Apply for Event'),
+                        label:
+                            Text(_applying ? 'Applying…' : 'Apply for Event'),
                       ),
                     ),
                 ],
@@ -188,10 +192,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: c.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20)),
-      child: Text(status,
-          style: TextStyle(color: c, fontWeight: FontWeight.w600)),
+          color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      child:
+          Text(status, style: TextStyle(color: c, fontWeight: FontWeight.w600)),
     );
   }
 

@@ -7,7 +7,6 @@ import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
 import 'screens/events_screen.dart';
-import 'screens/leaderboard_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -45,7 +44,8 @@ class ClubSphereApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
@@ -56,7 +56,8 @@ class ClubSphereApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
       home: const _RootRouter(),
@@ -66,7 +67,6 @@ class ClubSphereApp extends StatelessWidget {
         '/home': (_) => const HomeScreen(),
         '/clubs': (_) => const ClubsScreen(),
         '/events': (_) => const EventsScreen(),
-        '/leaderboard': (_) => const LeaderboardScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/admin': (_) => const AdminDashboardScreen(),

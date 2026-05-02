@@ -3,9 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
-// • Android emulator  → 10.0.2.2
-// • iOS simulator     → 127.0.0.1
-// • Real device       → your machine's LAN IP, e.g. 192.168.1.10
+// Android Emulator ke liye 10.0.2.2 zaroori hai
 const String _base = 'http://127.0.0.1:8000/api';
 
 class ApiException implements Exception {
@@ -21,19 +19,23 @@ class ApiService {
 
   static Future<String?> getAccessToken() async {
     final p = await SharedPreferences.getInstance();
-    return p.getString('access_token');
+    final token = p.getString('access_token');
+    print("DEBUG: Fetched Token: ${token != null ? 'EXISTS' : 'NULL'}");
+    return token;
   }
 
   static Future<void> saveTokens(String access, String refresh) async {
     final p = await SharedPreferences.getInstance();
     await p.setString('access_token', access);
     await p.setString('refresh_token', refresh);
+    print("DEBUG: Tokens saved successfully.");
   }
 
   static Future<void> clearTokens() async {
     final p = await SharedPreferences.getInstance();
     await p.remove('access_token');
     await p.remove('refresh_token');
+    print("DEBUG: Tokens cleared.");
   }
 
   // ─── Headers ──────────────────────────────────────────────────────────────
@@ -82,8 +84,7 @@ class ApiService {
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
     );
-    print(res.statusCode);
-    print(res.body);
+    print("DEBUG POST $path: ${res.statusCode}");
     return _decode(res);
   }
 

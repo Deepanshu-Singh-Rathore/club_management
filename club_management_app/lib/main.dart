@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
@@ -12,7 +13,11 @@ import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SharedPreferences.getInstance();
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthProvider()..tryRestoreSession(),
@@ -44,8 +49,9 @@ class ClubSphereApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
@@ -56,8 +62,10 @@ class ClubSphereApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
       home: const _RootRouter(),
@@ -76,7 +84,6 @@ class ClubSphereApp extends StatelessWidget {
   }
 }
 
-/// Decides which screen to show based on auth state.
 class _RootRouter extends StatelessWidget {
   const _RootRouter();
 
@@ -86,7 +93,9 @@ class _RootRouter extends StatelessWidget {
 
     if (auth.loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 

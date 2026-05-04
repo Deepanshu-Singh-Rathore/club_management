@@ -104,8 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       height: 18,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : const Text('Save',
-                      style: TextStyle(color: Colors.white)),
+                  : const Text('Save', style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -133,27 +132,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 24),
 
           // Points card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF0D47A1), Color(0xFF42A5F5)]),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 28),
-                const SizedBox(width: 10),
-                Text('${user.points} Points',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
 
           // Fields
           _sectionLabel('Full Name'),
@@ -209,8 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           OutlinedButton.icon(
             onPressed: _logout,
             icon: const Icon(Icons.logout, color: Colors.red),
-            label: const Text('Logout',
-                style: TextStyle(color: Colors.red)),
+            label: const Text('Logout', style: TextStyle(color: Colors.red)),
             style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.red)),
           ),

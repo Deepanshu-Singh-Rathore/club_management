@@ -9,7 +9,6 @@ import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
 import 'screens/my_clubs_screen.dart';
 import 'screens/events_screen.dart';
-//import 'screens/leaderboard_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -83,7 +82,6 @@ class ClubSphereApp extends StatelessWidget {
         '/admin': (_) => const AdminDashboardScreen(),
         '/clubhead/create-event': (_) => const CreateEventScreen(),
         '/event-detail': (context) => const EventDetailScreen(),
-        
       },
     );
   }

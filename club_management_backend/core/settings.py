@@ -21,7 +21,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # ---------------------------------------------------------------------------
 SECRET_KEY = env.str('SECRET_KEY', default='django-insecure-abc123xyz456-change-in-prod')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2'])  # type: ignore[call-overload]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2', '.up.railway.app'])  # type: ignore[call-overload]
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',          # must be first
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',     # serve static files in prod
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -54,11 +55,9 @@ MIDDLEWARE = [
 ]
 
 # ---------------------------------------------------------------------------
-# CORS – allow all origins in dev; restrict in production
+# CORS – mobile apps don't enforce CORS, allow all origins
 # ---------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = DEBUG
-_default_cors = 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173'
-CORS_ALLOWED_ORIGINS = env.str('CORS_ALLOWED_ORIGINS', default=_default_cors).split(',')
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'core.urls'
 
@@ -163,5 +162,6 @@ USE_TZ = True
 # ---------------------------------------------------------------------------
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

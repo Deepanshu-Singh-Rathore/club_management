@@ -75,7 +75,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
       if (mounted) {
         setState(() => appliedStatus = 'pending');
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Applied successfully')),
         );
@@ -91,8 +90,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-
     if (loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -101,10 +98,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     if (event == null) {
       return const Scaffold(
-        body: Center(child: Text("Event not found")),
+        body: Center(child: Text('Event not found')),
       );
     }
 
+    final auth = context.watch<AuthProvider>();
     final e = event!;
 
     return Scaffold(
@@ -119,7 +117,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -132,32 +129,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     if (e.capacity > 0)
                       Text(
                         '${e.registeredCount}/${e.capacity} seats',
-                        style:
-                            const TextStyle(color: Colors.grey, fontSize: 13),
+                        style: const TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                   ],
                 ),
-
                 const SizedBox(height: 14),
 
                 Text(
                   e.title,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 6),
 
                 Row(
                   children: [
-                    const Icon(Icons.group,
-                        size: 16, color: Colors.grey),
+                    const Icon(Icons.group, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text(e.clubName,
-                        style: const TextStyle(color: Colors.grey)),
+                    Text(e.clubName, style: const TextStyle(color: Colors.grey)),
                     const SizedBox(width: 16),
-                    const Icon(Icons.calendar_today,
-                        size: 16, color: Colors.grey),
+                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}',
@@ -165,40 +155,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 20),
 
                 const Text(
                   'About',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 8),
 
                 Text(
-                  e.description.isEmpty
-                      ? 'No description provided.'
-                      : e.description,
-                  style:
-                      const TextStyle(color: Colors.black87, height: 1.5),
+                  e.description.isEmpty ? 'No description provided.' : e.description,
+                  style: const TextStyle(color: Colors.black87, height: 1.5),
                 ),
-
                 const SizedBox(height: 30),
 
-                // STATUS SECTION
                 if (auth.isStudent) ...[
                   if (appliedStatus != null)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: _statusColor(appliedStatus!)
-                            .withOpacity(0.1),
+                        color: _statusColor(appliedStatus!).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _statusColor(appliedStatus!)
-                              .withOpacity(0.3),
+                          color: _statusColor(appliedStatus!).withOpacity(0.3),
                         ),
                       ),
                       child: Text(
@@ -230,12 +210,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white),
+                                    strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.how_to_reg),
-                        label: Text(
-                            applying ? 'Applying…' : 'Apply for Event'),
+                        label: Text(applying ? 'Applying…' : 'Apply for Event'),
                       ),
                     ),
                 ],
@@ -249,21 +227,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Widget _statusChip(String status) {
     final c = _statusColor(status);
-
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: c.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        status,
-        style: TextStyle(
-          color: c,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      child: Text(status, style: TextStyle(color: c, fontWeight: FontWeight.w600)),
     );
   }
 
@@ -274,4 +244,5 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         'cancelled' => Colors.red,
         _ => Colors.blue,
       };
+
 }

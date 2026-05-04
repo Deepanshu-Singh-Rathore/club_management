@@ -149,7 +149,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
                     // Club picker
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedClubId,
+                      value: _selectedClubId,
                       decoration: const InputDecoration(
                           labelText: 'Club',
                           prefixIcon: Icon(Icons.group)),

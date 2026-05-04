@@ -9,7 +9,7 @@ from datetime import timedelta
 import random
 
 from accounts.models import User
-from clubs.models import Club, Membership, Event, EventRegistration, Notification
+from clubs.models import Club, ClubMessage, Membership, Event, EventRegistration, Notification
 
 
 # CLUBS = [
@@ -82,6 +82,100 @@ CLUB_HEADS = [
 #     ("Entrepreneurship Summit", "ecell", -60, False),
 #     ("Open Mic Night", "music", -5, False),
 # ]
+CHAT_MESSAGES = {
+    "coding": [
+        "Hey everyone! Who's joining the hackathon this weekend?",
+        "I'm in! Already have a team of 3, need one more backend dev.",
+        "I can join — I'm decent with Django and FastAPI.",
+        "Great, let's connect after the DSA masterclass tomorrow.",
+        "Has anyone solved the last LeetCode weekly contest? Problem 3 was brutal.",
+        "Yeah I got stuck on problem 3 too. Dynamic programming with bitmask 😅",
+        "The Python bootcamp slides are up on the drive, check the announcements.",
+        "Thanks! Also, are we doing mock interviews this semester?",
+        "Yes! Starting next month. Sign-up sheet will be shared soon.",
+        "Can't wait. Also reminder that the club room is booked every Tuesday 5pm.",
+    ],
+    "robotics": [
+        "Bot War championship registrations are open! Get your bots ready.",
+        "Our line follower finally completed the track in under 10 seconds 🎉",
+        "That's insane! What sensor configuration are you using?",
+        "IR array with 8 sensors and PID tuning. Happy to share the code.",
+        "Please do! Our bot keeps overshooting the turns.",
+        "Meeting this Friday to test the arm actuator. Lab 204, 4pm.",
+        "Should we order more servo motors? We're running low.",
+        "I'll raise a requisition — need at least 6 MG996R servos.",
+        "Also the Arduino Mega we borrowed from ECE needs to go back by Monday.",
+        "Noted. I'll return it after Friday's session.",
+    ],
+    "photography": [
+        "The monsoon exhibition photos are up on the notice board — go check them out!",
+        "Absolutely loved Priya's shot of the rain on the library steps.",
+        "Thank you 😊 I used a 1/1000 shutter speed to freeze the drops.",
+        "Portrait walk is this Sunday 7am. Bring a prime lens if you have one.",
+        "What location are we meeting at?",
+        "Main gate. We'll walk towards the old campus — great textures there.",
+        "Can beginners join with just a phone camera?",
+        "Absolutely! Composition matters more than gear.",
+        "Quick tip: golden hour is 6:20–6:50am this week. Perfect for portraits.",
+        "Also we need volunteers to help curate the semester-end exhibition.",
+    ],
+    "debate": [
+        "Motion for Friday's practice: 'This house believes AI will do more harm than good.'",
+        "Interesting motion. I'll take the opposition side.",
+        "Same, I want to argue opposition. Anyone taking proposition?",
+        "I'll go proposition — already have some strong points on economic productivity.",
+        "Don't forget the MUN applications close this Sunday.",
+        "What committee should I apply for as a first-timer?",
+        "UNHRC or UNEP are usually more beginner-friendly.",
+        "The parliamentary debate prep sessions start Wednesday. Attendance is mandatory.",
+        "Can someone share the speaking time format for the inter-college event?",
+        "6 minutes constructive, 3 minutes rebuttal, 2 minutes summary.",
+    ],
+    "music": [
+        "Acoustic Night rehearsal is tonight at 7pm in the auditorium green room.",
+        "I'll be 10 mins late — coming from a lab. Please start without me.",
+        "No worries, we'll warm up first. Don't forget your capo.",
+        "Has the setlist been finalised?",
+        "Yes! Pinned in the group — 8 songs, mix of Hindi and English.",
+        "Can we add one more original? Taniya finished the bridge for her composition.",
+        "Let's hear it tonight and decide.",
+        "Band auditions results are out — welcome to our two new guitarists!",
+        "So excited to have them 🎸 Big talent this year.",
+        "Next session we'll start working on the annual fest performance. Big one!",
+    ],
+    "ecell": [
+        "Startup Pitch Fest registrations crossed 40 teams already!",
+        "Amazing turnout. Do we have enough judges confirmed?",
+        "5 confirmed so far — need at least 3 more. Reaching out to alumni network.",
+        "I connected with a VC from Bangalore who might join as a judge.",
+        "That would be incredible. Please share their contact with Deepanshu.",
+        "Workshop on 'Building an MVP in 30 days' is this Thursday, Room 301.",
+        "Is it open for non-members too?",
+        "Yes, open to all. Just register on the portal so we can arrange seating.",
+        "Reminder: business plan submissions for the internal round close tomorrow 11:59pm.",
+        "Good luck everyone — let's make this the best pitch fest yet! 🚀",
+    ],
+}
+
+EVENTS = [
+    # Upcoming
+    ("Hackathon 2025", "coding", 10, True),
+    ("Python Bootcamp", "coding", 5, True),
+    ("Bot War Championship", "robotics", 7, True),
+    ("Portrait Photography Walk", "photography", 3, True),
+    ("Inter-College Debate", "debate", 14, True),
+    ("Acoustic Night", "music", 2, True),
+    ("Startup Pitch Fest", "ecell", 21, True),
+    ("DSA Masterclass", "coding", 1, True),
+    # Completed
+    ("Web Dev Workshop", "coding", -30, False),
+    ("Line Follower Robot Contest", "robotics", -20, False),
+    ("Monsoon Photo Exhibition", "photography", -15, False),
+    ("Parliamentary Debate", "debate", -10, False),
+    ("Band Auditions", "music", -45, False),
+    ("Entrepreneurship Summit", "ecell", -60, False),
+    ("Open Mic Night", "music", -5, False),
+]
 
 
 # class Command(BaseCommand):
@@ -91,42 +185,7 @@ CLUB_HEADS = [
 #         self.stdout.write("Seeding database...")
 
         # --- Admin ---
-        admin, _ = User.objects.get_or_create(
-            email="admin@clubsphere.com",
-            defaults={
-                "full_name": "Super Admin",
-                "role": User.Role.ADMIN,
-                "is_staff": True,
-                "is_superuser": True,
-                "is_verified": True,
-                "roll_number": "ADMIN001",
-            },
-        )
-        admin.set_password("admin123")
-        admin.save()
-        self.stdout.write(f"  Admin: {admin.email} / admin123")
-
-        my_admin, created = User.objects.get_or_create(
-            email="vyasvineet7@gmail.com",
-            defaults={
-            "full_name": "vineet",
-            "role": User.Role.ADMIN,
-            "is_staff": True,
-            "is_superuser": True,
-            "is_verified": True,
-            "roll_number": "ADMIN002",
-            },
-        )
-
-        my_admin.role = User.Role.ADMIN
-        my_admin.is_staff = True
-        my_admin.is_superuser = True
-        my_admin.is_verified = True
-        my_admin.set_password("vineet123")
-        my_admin.save()
-
-        self.stdout.write(f"  Custom Admin: {my_admin.email} / vineet123")
-
+      
         # # --- Club Heads ---
         # head_users = []
         # for full_name, email, roll in CLUB_HEADS:
@@ -255,9 +314,4 @@ CLUB_HEADS = [
         #                 type="apply",
         #             )
 
-        self.stdout.write(f"  {reg_count} event registrations created")
-        self.stdout.write(self.style.SUCCESS("\nDone! Seed data loaded successfully."))
-        self.stdout.write("\nLogin credentials:")
-        self.stdout.write("  Admin      -> admin@clubsphere.com / admin123")
-        self.stdout.write("  Club heads -> e.g. rahul.kapoor@college.edu / head123")
-        self.stdout.write("  Students   -> e.g. aarav.sharma@college.edu / student123")
+       

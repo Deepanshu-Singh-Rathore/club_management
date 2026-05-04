@@ -36,8 +36,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       if (mounted) {
         setState(() {
-          _notifs = items;
-          _loading = false;
+          _notifs = raw
+              .map((e) =>
+                  AppNotification.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _loading = false;  
         });
       }
     } catch (e) {

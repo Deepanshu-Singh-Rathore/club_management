@@ -146,6 +146,35 @@ class ClubMembersView(APIView):
         })
 
 
+class UserClubsView(APIView):
+    """
+    GET /api/clubs/user/my/  – list clubs the authenticated user is a member of
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        memberships = (
+            Membership.objects
+            .filter(user=request.user)
+            .select_related('club__created_by')
+            .order_by('-joined_at')
+        )
+        clubs = [
+            {
+                'id': str(m.club.id),
+                'name': m.club.name,
+                'description': m.club.description,
+                'member_count': m.club.memberships.count(),
+                'created_by': {
+                    'full_name': m.club.created_by.full_name if m.club.created_by else None,
+                } if m.club.created_by else None,
+                'joined_at': m.joined_at.isoformat(),
+            }
+            for m in memberships
+        ]
+        return Response(clubs)
+
+
 # ---------------------------------------------------------------------------
 # EVENT VIEWS
 # ---------------------------------------------------------------------------

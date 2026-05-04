@@ -8,13 +8,10 @@ class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({super.key});
 
   @override
-  State<EventDetailScreen> createState() =>
-      _EventDetailScreenState();
+  State<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState
-    extends State<EventDetailScreen> {
-
+class _EventDetailScreenState extends State<EventDetailScreen> {
   Event? event;
   bool loading = true;
   bool applying = false;
@@ -24,8 +21,7 @@ class _EventDetailScreenState
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final eventId =
-        ModalRoute.of(context)!.settings.arguments;
+    final eventId = ModalRoute.of(context)!.settings.arguments;
 
     if (event == null && eventId != null) {
       _loadEvent(eventId.toString());
@@ -78,13 +74,13 @@ class _EventDetailScreenState
       await ApiService.applyForEvent(event!.id);
 
       if (mounted) {
-        // Apply dabate hi status 'pending' set hoga
-        setState(() => _appliedStatus = 'pending');
+        setState(() => appliedStatus = 'pending');
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Applied successfully')),
         );
       }
-    } catch (e) {
+    } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error applying')),
       );
@@ -96,6 +92,20 @@ class _EventDetailScreenState
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
+    if (loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (event == null) {
+      return const Scaffold(
+        body: Center(child: Text("Event not found")),
+      );
+    }
+
+    final e = event!;
 
     return Scaffold(
       appBar: AppBar(title: Text(e.title)),
@@ -109,121 +119,123 @@ class _EventDetailScreenState
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
+
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  _statusChip(e.status),
-                  const Spacer(),
-                  if (e.capacity > 0)
-                    Text(
-                      '${e.registeredCount}/${e.capacity} seats',
-                      style: const TextStyle(color: Colors.grey, fontSize: 13),
-                    ),
-                ]),
+                Row(
+                  children: [
+                    _statusChip(e.status),
+                    const Spacer(),
+                    if (e.capacity > 0)
+                      Text(
+                        '${e.registeredCount}/${e.capacity} seats',
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                  ],
+                ),
+
                 const SizedBox(height: 14),
 
-                Text(e.title,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(
+                  e.title,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+
                 const SizedBox(height: 6),
 
-                Row(children: [
-                  const Icon(Icons.group, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(e.clubName, style: const TextStyle(color: Colors.grey)),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.calendar_today,
-                      size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ]),
+                Row(
+                  children: [
+                    const Icon(Icons.group,
+                        size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(e.clubName,
+                        style: const TextStyle(color: Colors.grey)),
+                    const SizedBox(width: 16),
+                    const Icon(Icons.calendar_today,
+                        size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 20),
 
-                const Text('About',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'About',
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+
                 const SizedBox(height: 8),
+
                 Text(
                   e.description.isEmpty
                       ? 'No description provided.'
                       : e.description,
-                  style: const TextStyle(color: Colors.black87, height: 1.5),
+                  style:
+                      const TextStyle(color: Colors.black87, height: 1.5),
                 ),
+
                 const SizedBox(height: 30),
 
-                // DEEPANSHU LOGIC APPLIED HERE:
+                // STATUS SECTION
                 if (auth.isStudent) ...[
-                  if (_appliedStatus != null)
+                  if (appliedStatus != null)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: _statusColor(_appliedStatus!).withOpacity(0.1),
+                        color: _statusColor(appliedStatus!)
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color:
-                                _statusColor(_appliedStatus!).withOpacity(0.3)),
+                          color: _statusColor(appliedStatus!)
+                              .withOpacity(0.3),
+                        ),
                       ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-
-                          Text(event!.title,
-                              style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold)),
-
-                          const SizedBox(height: 10),
-
-                          Text(event!.description),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            // Logic:
-                            // 1. Agar admin accept kare (approved) -> 'Applied'
-                            // 2. Agar apply kiya hai par wait hai (pending) -> 'Application pending'
-                            _appliedStatus == 'approved'
-                                ? 'Applied'
-                                : (_appliedStatus == 'pending'
-                                    ? 'Application pending'
-                                    : 'Application ${_appliedStatus!}'),
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _statusColor(_appliedStatus!)),
-                          ),
-                        ],
+                      child: Text(
+                        appliedStatus == 'approved'
+                            ? 'Applied'
+                            : appliedStatus == 'pending'
+                                ? 'Application pending'
+                                : 'Application $appliedStatus',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _statusColor(appliedStatus!),
+                        ),
                       ),
                     )
                   else if (e.isFull)
                     const Center(
-                      child: Text('Event is full',
-                          style: TextStyle(color: Colors.red)),
+                      child: Text(
+                        'Event is full',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     )
                   else
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _applying ? null : _apply,
-                        icon: _applying
+                        onPressed: applying ? null : _apply,
+                        icon: applying
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
+                                    strokeWidth: 2,
+                                    color: Colors.white),
+                              )
                             : const Icon(Icons.how_to_reg),
-                        label:
-                            Text(_applying ? 'Applying…' : 'Apply for Event'),
+                        label: Text(
+                            applying ? 'Applying…' : 'Apply for Event'),
                       ),
                     ),
                 ],
@@ -237,12 +249,21 @@ class _EventDetailScreenState
 
   Widget _statusChip(String status) {
     final c = _statusColor(status);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-      child:
-          Text(status, style: TextStyle(color: c, fontWeight: FontWeight.w600)),
+        color: c.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          color: c,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -252,11 +273,5 @@ class _EventDetailScreenState
         'completed' => Colors.green,
         'cancelled' => Colors.red,
         _ => Colors.blue,
-      };
-
-  IconData _statusIcon(String s) => switch (s) {
-        'approved' => Icons.check_circle,
-        'rejected' => Icons.cancel,
-        _ => Icons.hourglass_top,
       };
 }

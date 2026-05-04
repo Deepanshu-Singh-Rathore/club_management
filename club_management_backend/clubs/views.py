@@ -3,6 +3,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
+from django.db import transaction
+from accounts.models import User
+from rest_framework import generics
 
 from django.utils import timezone
 from .models import Club, Membership, Event, EventRegistration, Notification, EventSuggestionPoll, EventSuggestion, ClubMessage
@@ -176,26 +179,48 @@ class UserClubsView(APIView):
 # EVENT VIEWS
 # ---------------------------------------------------------------------------
 
-class EventListCreateView(APIView):
+class EventListCreateView(generics.ListCreateAPIView):
+    serializer_class = EventSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
-    def get(self, request):
-        events = Event.objects.select_related('club', 'created_by').prefetch_related('registrations')
+    def get(self, request, *args, **kwargs):
+        events = Event.objects.select_related(
+            'club', 'created_by'
+        ).prefetch_related('registrations')
+
         club_id = request.query_params.get('club')
         if club_id:
             events = events.filter(club_id=club_id)
+
         return Response(EventSerializer(events, many=True).data)
 
-    def post(self, request):
-        if request.user.role not in ('club_head', 'admin'):
-            return Response({'error': 'Only club_head or admin can create events'}, status=403)
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        serializer = EventCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+        with transaction.atomic():
+            event = serializer.save()
 
-        event = serializer.save(created_by=request.user)
-        return Response(EventSerializer(event).data, status=201)
+            
+            users = User.objects.filter(role__in=['student', 'club_head'])
+
+            print("EVENT CREATED:", event.title)
+            print("TOTAL USERS:", users.count())
+
+            notifications = [
+                Notification(
+                    user=user,
+                    message=f"New Event: {event.title}",
+                    type="event",
+                    event=event,
+                    club=event.club,
+                )
+                for user in users
+            ]
+
+            Notification.objects.bulk_create(notifications)
+
+        return Response(serializer.data, status=201)
 
 
 class EventDetailView(APIView):
@@ -265,24 +290,36 @@ class ApplyEventView(APIView):
 
     def post(self, request, pk):
         try:
-            event = Event.objects.get(pk=pk)
+            event = Event.objects.select_related('club').get(pk=pk)
         except Event.DoesNotExist:
             return Response({'error': 'Event not found'}, status=404)
 
         if EventRegistration.objects.filter(user=request.user, event=event).exists():
             return Response({'message': 'Already applied'}, status=400)
 
-        approved_count = EventRegistration.objects.filter(event=event, status='approved').count()
+        approved_count = EventRegistration.objects.filter(
+            event=event,
+            status='approved'
+        ).count()
+
         if event.capacity and approved_count >= event.capacity:
             return Response({'message': 'Event is at full capacity'}, status=400)
 
-        EventRegistration.objects.create(user=request.user, event=event, status='pending')
+        EventRegistration.objects.create(
+            user=request.user,
+            event=event,
+            status='pending'
+        )
 
-        if event.created_by:
+        admins = User.objects.filter(role='admin')
+
+        for admin in admins:
             Notification.objects.create(
-                user=event.created_by,
+                user=admin,
                 message=f'{request.user.full_name or request.user.email} applied for "{event.title}"',
                 type='apply',
+                event=event,
+                club=event.club,
             )
 
         return Response({'message': 'Applied successfully'}, status=201)
@@ -299,9 +336,12 @@ class PendingRegistrationsView(APIView):
         regs = (
             EventRegistration.objects
             .filter(event_id=pk, status='pending')
-            .select_related('user', 'event')
+            .select_related('user', 'event', 'event__club')
         )
-        return Response(EventRegistrationSerializer(regs, many=True).data)
+
+        return Response(
+            EventRegistrationSerializer(regs, many=True).data
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -313,32 +353,44 @@ class ApproveRegistrationView(APIView):
 
     def post(self, request, pk):
         reg_id = request.data.get('registration_id')
+
         try:
-            reg = EventRegistration.objects.select_related('user', 'event').get(
-                id=reg_id, event_id=pk
-            )
+            reg = EventRegistration.objects.select_related(
+                'user', 'event', 'event__club'
+            ).get(id=reg_id, event_id=pk)
         except EventRegistration.DoesNotExist:
             return Response({'error': 'Registration not found'}, status=404)
 
-        approved = EventRegistration.objects.filter(event_id=pk, status='approved').count()
+        approved = EventRegistration.objects.filter(
+            event_id=pk,
+            status='approved'
+        ).count()
+
         if reg.event.capacity and approved >= reg.event.capacity:
             return Response({'error': 'Event is at full capacity'}, status=400)
 
+        # ✅ Approve
         reg.status = 'approved'
         reg.save()
 
-        # Award points to the student
+        # ✅ Points
         points = getattr(settings, 'EVENT_APPROVAL_POINTS', 10)
         reg.user.points += points
         reg.user.save(update_fields=['points'])
 
+        # ✅ Notification (IMPORTANT FIX)
         Notification.objects.create(
             user=reg.user,
             message=f'You have been approved for "{reg.event.title}" (+{points} pts)',
             type='approved',
+            event=reg.event,
+            club=reg.event.club,
         )
 
-        return Response({'message': 'Approved', 'points_awarded': points})
+        return Response({
+            'message': 'Approved',
+            'points_awarded': points
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -350,20 +402,25 @@ class RejectRegistrationView(APIView):
 
     def post(self, request, pk):
         reg_id = request.data.get('registration_id')
+
         try:
-            reg = EventRegistration.objects.select_related('user', 'event').get(
-                id=reg_id, event_id=pk
-            )
+            reg = EventRegistration.objects.select_related(
+                'user', 'event', 'event__club'
+            ).get(id=reg_id, event_id=pk)
         except EventRegistration.DoesNotExist:
             return Response({'error': 'Registration not found'}, status=404)
 
+        # ❌ Reject
         reg.status = 'rejected'
         reg.save()
 
+        # ✅ Notification (IMPORTANT FIX)
         Notification.objects.create(
             user=reg.user,
-            message=f'Your application for "{reg.event.title}" was not accepted',
+            message=f'Your application for "{reg.event.title}" was rejected',
             type='rejected',
+            event=reg.event,
+            club=reg.event.club,
         )
 
         return Response({'message': 'Rejected'})
@@ -386,11 +443,16 @@ class MarkNotificationReadView(APIView):
 
     def post(self, request, pk):
         try:
-            notif = Notification.objects.get(pk=pk, user=request.user)
+            notification = Notification.objects.get(
+                pk=pk,
+                user=request.user
+            )
         except Notification.DoesNotExist:
             return Response({'error': 'Notification not found'}, status=404)
-        notif.is_read = True
-        notif.save(update_fields=['is_read'])
+
+        notification.is_read = True
+        notification.save(update_fields=['is_read'])
+
         return Response({'message': 'Marked as read'})
 
 

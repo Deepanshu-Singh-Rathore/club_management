@@ -30,8 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ClubSphere',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'ClubSphere',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -60,13 +62,15 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home'),
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
           NavigationDestination(
-              icon: Icon(Icons.group_outlined),
-              selectedIcon: Icon(Icons.group),
-              label: 'Clubs'),
+            icon: Icon(Icons.group_outlined),
+            selectedIcon: Icon(Icons.group),
+            label: 'Clubs',
+          ),
           NavigationDestination(
               icon: Icon(Icons.event_outlined),
               selectedIcon: Icon(Icons.event),
@@ -75,8 +79,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: (auth.isAdmin || auth.isClubHead)
           ? FloatingActionButton.extended(
-              onPressed: () =>
-                  Navigator.pushNamed(context, '/clubhead/create-event'),
+              onPressed: () async {
+                await Navigator.pushNamed(context, '/clubhead/create-event');
+
+                setState(() {
+                  _tab = 0;
+                });
+              },
               icon: const Icon(Icons.add),
               label: const Text('New Event'),
             )
@@ -84,8 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// ─── Dashboard tab ───────────────────────────────────────────────────────────
 
 class _DashboardTab extends StatefulWidget {
   const _DashboardTab();
@@ -108,21 +115,33 @@ class _DashboardTabState extends State<_DashboardTab> {
   Future<void> _load() async {
     final auth = context.read<AuthProvider>();
     final futures = <Future>[ApiService.getEvents()];
-    if (auth.isAdmin) futures.add(ApiService.getAdminStats());
 
-    final results =
-        await Future.wait(futures.map((f) => f.catchError((_) => null)));
+    if (auth.isAdmin) {
+      futures.add(ApiService.getAdminStats());
+    }
+
+    final results = await Future.wait(
+      futures.map((f) => f.catchError((_) => null)),
+    );
 
     if (!mounted) return;
+
+    final raw = results[0] as List?;
+
+    final allEvents = (raw ?? [])
+        .map((e) => Event.fromJson(e as Map<String, dynamic>))
+        .where((e) => e.status == 'upcoming')
+        .toList();
+
+    allEvents.sort((a, b) => a.eventDate.compareTo(b.eventDate));
+
     setState(() {
-      final raw = results[0] as List?;
-      _events = (raw ?? [])
-          .take(4)
-          .map((e) => Event.fromJson(e as Map<String, dynamic>))
-          .toList();
+      _events = allEvents.take(6).toList();
+
       if (auth.isAdmin && results.length > 1 && results[1] != null) {
         _stats = results[1] as Map<String, dynamic>;
       }
+
       _loading = false;
     });
   }
@@ -141,7 +160,6 @@ class _DashboardTabState extends State<_DashboardTab> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Welcome banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -154,80 +172,99 @@ class _DashboardTabState extends State<_DashboardTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Welcome back,',
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
                 Text(
                   user?.displayName ?? '',
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                if (auth.isStudent)
-                  _Chip('${user?.points ?? 0} pts', Icons.star),
-                if (auth.isAdmin) _Chip('Admin', Icons.shield),
-                if (auth.isClubHead) _Chip('Club Head', Icons.manage_accounts),
+                if (auth.isStudent) _Chip('${user?.points ?? 0} pts', Icons.star),
+                if (auth.isAdmin) const _Chip('Admin', Icons.shield),
+                if (auth.isClubHead)
+                  const _Chip('Club Head', Icons.manage_accounts),
               ],
             ),
           ),
+
           const SizedBox(height: 20),
 
-          // Admin stats row
           if (auth.isAdmin && _stats.isNotEmpty) ...[
             const _SectionHeader('Overview'),
             const SizedBox(height: 10),
-            Row(children: [
-              _StatCard('Users', '${_stats['total_users'] ?? 0}', Icons.people,
-                  Colors.blue),
-              const SizedBox(width: 12),
-              _StatCard('Clubs', '${_stats['total_clubs'] ?? 0}', Icons.group,
-                  Colors.purple),
-              const SizedBox(width: 12),
-              _StatCard('Events', '${_stats['total_events'] ?? 0}', Icons.event,
-                  Colors.green),
-            ]),
+            Row(
+              children: [
+                _StatCard(
+                  'Users',
+                  '${_stats['total_users'] ?? 0}',
+                  Icons.people,
+                  Colors.blue,
+                ),
+                const SizedBox(width: 12),
+                _StatCard(
+                  'Clubs',
+                  '${_stats['total_clubs'] ?? 0}',
+                  Icons.group,
+                  Colors.purple,
+                ),
+                const SizedBox(width: 12),
+                _StatCard(
+                  'Events',
+                  '${_stats['total_events'] ?? 0}',
+                  Icons.event,
+                  Colors.green,
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             _StatCard(
-                'Pending approvals',
-                '${_stats['pending_registrations'] ?? 0}',
-                Icons.pending_actions,
-                Colors.orange,
-                wide: true),
+              'Pending approvals',
+              '${_stats['pending_registrations'] ?? 0}',
+              Icons.pending_actions,
+              Colors.orange,
+              wide: true,
+            ),
             const SizedBox(height: 20),
-
-            // Admin quick actions
             const _SectionHeader('Admin Panel'),
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.people,
-                  label: 'Manage Users',
-                  onTap: () => Navigator.pushNamed(context, '/admin'),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.people,
+                    label: 'Manage Users',
+                    onTap: () => Navigator.pushNamed(context, '/admin'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.group,
-                  label: 'Manage Clubs',
-                  onTap: () => Navigator.pushNamed(context, '/clubs'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.group,
+                    label: 'Manage Clubs',
+                    onTap: () => Navigator.pushNamed(context, '/clubs'),
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
             const SizedBox(height: 20),
           ],
 
-          // Upcoming events
           const _SectionHeader('Upcoming Events'),
           const SizedBox(height: 10),
+
           if (_events.isEmpty)
             const Center(
-                child: Text('No upcoming events',
-                    style: TextStyle(color: Colors.grey)))
+              child: Text(
+                'No upcoming events',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
           else
             ..._events.map((e) => _EventTile(event: e)),
         ],
@@ -236,34 +273,43 @@ class _DashboardTabState extends State<_DashboardTab> {
   }
 }
 
-// ─── Small reusable widgets ───────────────────────────────────────────────────
-
 class _Chip extends StatelessWidget {
   final String label;
   final IconData icon;
+
   const _Chip(this.label, this.icon);
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-            color: Colors.white24, borderRadius: BorderRadius.circular(20)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 13)),
-        ]),
+          color: Colors.white24,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: Colors.white),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ],
+        ),
       );
 }
 
 class _SectionHeader extends StatelessWidget {
   final String title;
+
   const _SectionHeader(this.title);
 
   @override
-  Widget build(BuildContext context) => Text(title,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold));
+  Widget build(BuildContext context) => Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      );
 }
 
 class _StatCard extends StatelessWidget {
@@ -272,8 +318,14 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final bool wide;
-  const _StatCard(this.label, this.value, this.icon, this.color,
-      {this.wide = false});
+
+  const _StatCard(
+    this.label,
+    this.value,
+    this.icon,
+    this.color, {
+    this.wide = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -284,14 +336,25 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 8),
-        Text(value,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 8),
+          Text(
+            value,
             style: TextStyle(
-                fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ]),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
     );
     return wide
         ? SizedBox(width: double.infinity, child: card)
@@ -303,8 +366,12 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ActionButton(
-      {required this.icon, required this.label, required this.onTap});
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -315,21 +382,30 @@ class _ActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF0D47A1).withOpacity(0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF0D47A1).withOpacity(0.2)),
+            border: Border.all(
+              color: const Color(0xFF0D47A1).withOpacity(0.2),
+            ),
           ),
-          child: Column(children: [
-            Icon(icon, color: const Color(0xFF0D47A1)),
-            const SizedBox(height: 6),
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          ]),
+          child: Column(
+            children: [
+              Icon(icon, color: const Color(0xFF0D47A1)),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }
 
 class _EventTile extends StatelessWidget {
   final Event event;
+
   const _EventTile({required this.event});
 
   @override
@@ -343,18 +419,29 @@ class _EventTile extends StatelessWidget {
           backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
           child: const Icon(Icons.event, color: Color(0xFF0D47A1)),
         ),
-        title: Text(event.title,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(event.clubName,
-            style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        title: Text(
+          event.title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          event.clubName,
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
         trailing: Text(
           '${event.eventDate.day} ${_month(event.eventDate.month)}',
           style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF0D47A1)),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0D47A1),
+          ),
         ),
-        onTap: () => Navigator.pushNamed(context, '/events'),
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            '/event-detail',
+            arguments: event.id,
+          );
+        },
       ),
     );
   }
@@ -372,6 +459,6 @@ class _EventTile extends StatelessWidget {
         'Sep',
         'Oct',
         'Nov',
-        'Dec'
+        'Dec',
       ][m];
 }

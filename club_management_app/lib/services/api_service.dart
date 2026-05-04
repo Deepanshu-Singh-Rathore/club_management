@@ -232,12 +232,12 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createEvent({
-    required String title,
-    required String description,
-    required String eventDate,
-    required String clubId,
-    int capacity = 0,
-    String? imageUrl,
+  required String title,
+  required String description,
+  required String eventDate,
+  required String clubId,
+  int capacity = 0,
+  String? imageUrl,
   }) async {
     return await post('/clubs/events/', {
       'title': title,

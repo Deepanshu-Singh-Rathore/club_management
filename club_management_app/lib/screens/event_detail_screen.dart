@@ -5,62 +5,97 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 class EventDetailScreen extends StatefulWidget {
-  final Event event;
-  const EventDetailScreen({super.key, required this.event});
+  const EventDetailScreen({super.key});
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  State<EventDetailScreen> createState() =>
+      _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
-  bool _applying = false;
-  String? _appliedStatus;
+class _EventDetailScreenState
+    extends State<EventDetailScreen> {
+
+  Event? event;
+  bool loading = true;
+  bool applying = false;
+  String? appliedStatus;
 
   @override
-  void initState() {
-    super.initState();
-    _checkStatus();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final eventId =
+        ModalRoute.of(context)!.settings.arguments;
+
+    if (event == null && eventId != null) {
+      _loadEvent(eventId.toString());
+    }
+  }
+
+  Future<void> _loadEvent(String id) async {
+    try {
+      final data = await ApiService.getEvent(id);
+      final e = Event.fromJson(data);
+
+      if (mounted) {
+        setState(() {
+          event = e;
+          loading = false;
+        });
+
+        _checkStatus();
+      }
+    } catch (_) {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> _checkStatus() async {
+    if (event == null) return;
+
     try {
       final regs = await ApiService.getMyEvents();
+
       final match = regs.firstWhere(
-        (r) => (r as Map)['event']['id'] == widget.event.id,
+        (r) => (r as Map)['event']['id'] == event!.id,
         orElse: () => null,
       );
+
       if (mounted && match != null) {
-        setState(() => _appliedStatus = (match as Map)['status'] as String);
+        setState(() {
+          appliedStatus = (match as Map)['status'];
+        });
       }
     } catch (_) {}
   }
 
   Future<void> _apply() async {
-    setState(() => _applying = true);
+    if (event == null) return;
+
+    setState(() => applying = true);
+
     try {
-      await ApiService.applyForEvent(widget.event.id);
+      await ApiService.applyForEvent(event!.id);
+
       if (mounted) {
         // Apply dabate hi status 'pending' set hoga
         setState(() => _appliedStatus = 'pending');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Application submitted!')),
+          const SnackBar(content: Text('Applied successfully')),
         );
       }
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.orange),
-        );
-      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error applying')),
+      );
     } finally {
-      if (mounted) setState(() => _applying = false);
+      if (mounted) setState(() => applying = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final e = widget.event;
 
     return Scaffold(
       appBar: AppBar(title: Text(e.title)),
@@ -135,12 +170,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             color:
                                 _statusColor(_appliedStatus!).withOpacity(0.3)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
-                          Icon(_statusIcon(_appliedStatus!),
-                              color: _statusColor(_appliedStatus!)),
-                          const SizedBox(width: 8),
+
+                          Text(event!.title,
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold)),
+
+                          const SizedBox(height: 10),
+
+                          Text(event!.description),
+
+                          const SizedBox(height: 10),
+
                           Text(
                             // Logic:
                             // 1. Agar admin accept kare (approved) -> 'Applied'

@@ -4,7 +4,6 @@ import '../models/club.dart';
 import '../models/event.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import 'event_detail_screen.dart';
 import 'club_chat_screen.dart';
 
 class ClubDetailScreen extends StatefulWidget {
@@ -52,13 +51,17 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           _isJoined = true; // Button ko 'Joined' karne ke liye
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Joined ${widget.club.name}!')),
+          SnackBar(
+              content:
+                  Text('Joined ${widget.club.name}!')),
         );
       }
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.orange),
+          SnackBar(
+              content: Text(e.message),
+              backgroundColor: Colors.orange),
         );
       }
     } finally {
@@ -80,7 +83,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => ClubChatScreen(club: widget.club)),
+                builder: (_) =>
+                    ClubChatScreen(club: widget.club),
+              ),
             ),
           ),
         ],
@@ -88,13 +93,15 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Club Header
           Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Row(children: [
                     CircleAvatar(
@@ -102,32 +109,47 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                       backgroundColor:
                           const Color(0xFF0D47A1).withOpacity(0.12),
                       child: Text(
-                        widget.club.name[0].toUpperCase(),
+                        widget.club.name[0]
+                            .toUpperCase(),
                         style: const TextStyle(
                             fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1)),
+                            fontWeight:
+                                FontWeight.bold,
+                            color:
+                                Color(0xFF0D47A1)),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(widget.club.name,
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
-                            Text('${widget.club.memberCount} members',
-                                style: const TextStyle(color: Colors.grey)),
-                          ]),
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.club.name,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight:
+                                    FontWeight.bold),
+                          ),
+                          Text(
+                            '${widget.club.memberCount} members',
+                            style: const TextStyle(
+                                color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     ),
                   ]),
-                  if (widget.club.description.isNotEmpty) ...[
+
+                  if (widget.club
+                      .description.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Text(widget.club.description,
-                        style: const TextStyle(color: Colors.black87)),
+                    Text(widget.club.description),
                   ],
+
                   const SizedBox(height: 16),
+
                   if (auth.isStudent)
                     SizedBox(
                       width: double.infinity,
@@ -154,34 +176,61 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 20),
-          const Text('Events',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+
+          // Events
+          const Text(
+            'Events',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
+
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Center(
+                child:
+                    CircularProgressIndicator())
           else if (_events.isEmpty)
-            const Text('No events for this club yet.',
-                style: TextStyle(color: Colors.grey))
+            const Text(
+              'No events for this club yet.',
+              style: TextStyle(color: Colors.grey),
+            )
           else
-            ..._events.map((e) => Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    leading: const Icon(Icons.event, color: Color(0xFF0D47A1)),
-                    title: Text(e.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(
-                        '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}'),
-                    trailing: _statusChip(e.status),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => EventDetailScreen(event: e)),
-                    ),
+            ..._events.map(
+              (e) => Card(
+                margin:
+                    const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(14),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.event,
+                      color: Color(0xFF0D47A1)),
+                  title: Text(
+                    e.title,
+                    style: const TextStyle(
+                        fontWeight:
+                            FontWeight.bold),
                   ),
-                )),
+                  subtitle: Text(
+                    '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}',
+                  ),
+                  trailing: _statusChip(e.status),
+
+                  // ✅ FIXED NAVIGATION
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      '/event-detail',
+                      arguments: e.id,
+                    );
+                  },
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -193,12 +242,22 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       'completed': Colors.green,
       'cancelled': Colors.red,
     };
+
     final c = colors[status] ?? Colors.grey;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-          color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-      child: Text(status, style: TextStyle(color: c, fontSize: 12)),
+        color: c.withOpacity(0.12),
+        borderRadius:
+            BorderRadius.circular(20),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+            color: c, fontSize: 12),
+      ),
     );
   }
 }

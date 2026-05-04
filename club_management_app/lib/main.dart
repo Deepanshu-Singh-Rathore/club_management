@@ -9,10 +9,12 @@ import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
 import 'screens/my_clubs_screen.dart';
 import 'screens/events_screen.dart';
+//import 'screens/leaderboard_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
+import 'screens/event_detail_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +82,8 @@ class ClubSphereApp extends StatelessWidget {
         '/notifications': (_) => const NotificationsScreen(),
         '/admin': (_) => const AdminDashboardScreen(),
         '/clubhead/create-event': (_) => const CreateEventScreen(),
+        '/event-detail': (context) => const EventDetailScreen(),
+        
       },
     );
   }

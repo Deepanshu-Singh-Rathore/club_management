@@ -3,9 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
-// • Android emulator  → 10.0.2.2
-// • iOS simulator     → 127.0.0.1
-// • Real device       → your machine's LAN IP, e.g. 192.168.1.10
+// Android Emulator ke liye 10.0.2.2 zaroori hai
 const String _base = 'http://127.0.0.1:8000/api';
 
 class ApiException implements Exception {
@@ -21,19 +19,23 @@ class ApiService {
 
   static Future<String?> getAccessToken() async {
     final p = await SharedPreferences.getInstance();
-    return p.getString('access_token');
+    final token = p.getString('access_token');
+    print("DEBUG: Fetched Token: ${token != null ? 'EXISTS' : 'NULL'}");
+    return token;
   }
 
   static Future<void> saveTokens(String access, String refresh) async {
     final p = await SharedPreferences.getInstance();
     await p.setString('access_token', access);
     await p.setString('refresh_token', refresh);
+    print("DEBUG: Tokens saved successfully.");
   }
 
   static Future<void> clearTokens() async {
     final p = await SharedPreferences.getInstance();
     await p.remove('access_token');
     await p.remove('refresh_token');
+    print("DEBUG: Tokens cleared.");
   }
 
   // ─── Headers ──────────────────────────────────────────────────────────────
@@ -82,6 +84,7 @@ class ApiService {
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
     );
+    print("DEBUG POST $path: ${res.statusCode}");
     return _decode(res);
   }
 
@@ -115,31 +118,38 @@ class ApiService {
     String rollNumber = '',
     String phoneNumber = '',
   }) async {
-    return await post('/auth/register/', {
-      'full_name': fullName,
-      'email': email,
-      'password': password,
-      'roll_number': rollNumber,
-      'phone_number': phoneNumber,
-      'role': 'student',
-    }, auth: false) as Map<String, dynamic>;
+    return await post(
+        '/auth/register/',
+        {
+          'full_name': fullName,
+          'email': email,
+          'password': password,
+          'roll_number': rollNumber,
+          'phone_number': phoneNumber,
+          'role': 'student',
+        },
+        auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    return await post('/auth/login/', {
-      'email': email,
-      'password': password,
-    }, auth: false) as Map<String, dynamic>;
+    return await post(
+        '/auth/login/',
+        {
+          'email': email,
+          'password': password,
+        },
+        auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> getMe() async {
     return await get('/auth/me/') as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> updateMe(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updateMe(
+      Map<String, dynamic> data) async {
     return await patch('/auth/me/', data) as Map<String, dynamic>;
   }
 
@@ -204,6 +214,10 @@ class ApiService {
     return await post('/clubs/$clubId/join/', {}) as Map<String, dynamic>;
   }
 
+  static Future<List<dynamic>> getUserClubs() async {
+    return await get('/clubs/user/my/') as List<dynamic>;
+  }
+
   // =========================================================================
   // EVENTS
   // =========================================================================
@@ -240,7 +254,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> applyForEvent(String eventId) async {
-    return await post('/clubs/events/$eventId/apply/', {}) as Map<String, dynamic>;
+    return await post('/clubs/events/$eventId/apply/', {})
+        as Map<String, dynamic>;
   }
 
   static Future<List<dynamic>> getPendingRegistrations(String eventId) async {

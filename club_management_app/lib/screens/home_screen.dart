@@ -39,9 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationsScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
           ),
           IconButton(
@@ -74,15 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Clubs',
           ),
           NavigationDestination(
-            icon: Icon(Icons.event_outlined),
-            selectedIcon: Icon(Icons.event),
-            label: 'Events',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.leaderboard_outlined),
-            selectedIcon: Icon(Icons.leaderboard),
-            label: 'Ranks',
-          ),
+              icon: Icon(Icons.event_outlined),
+              selectedIcon: Icon(Icons.event),
+              label: 'Events'),
         ],
       ),
       floatingActionButton: (auth.isAdmin || auth.isClubHead)
@@ -364,8 +356,9 @@ class _StatCard extends StatelessWidget {
         ],
       ),
     );
-
-    return wide ? SizedBox(width: double.infinity, child: card) : Expanded(child: card);
+    return wide
+        ? SizedBox(width: double.infinity, child: card)
+        : Expanded(child: card);
   }
 }
 

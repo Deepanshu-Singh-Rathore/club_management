@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
+import 'screens/my_clubs_screen.dart';
 import 'screens/events_screen.dart';
 //import 'screens/leaderboard_screen.dart';
 import 'screens/profile_screen.dart';
@@ -14,7 +16,11 @@ import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
 import 'screens/event_detail_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SharedPreferences.getInstance();
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthProvider()..tryRestoreSession(),
@@ -46,7 +52,9 @@ class ClubSphereApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
@@ -57,7 +65,10 @@ class ClubSphereApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
       home: const _RootRouter(),
@@ -67,7 +78,6 @@ class ClubSphereApp extends StatelessWidget {
         '/home': (_) => const HomeScreen(),
         '/clubs': (_) => const ClubsScreen(),
         '/events': (_) => const EventsScreen(),
-        //'/leaderboard': (_) => const LeaderboardScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/admin': (_) => const AdminDashboardScreen(),
@@ -79,7 +89,6 @@ class ClubSphereApp extends StatelessWidget {
   }
 }
 
-/// Decides which screen to show based on auth state.
 class _RootRouter extends StatelessWidget {
   const _RootRouter();
 
@@ -89,7 +98,9 @@ class _RootRouter extends StatelessWidget {
 
     if (auth.loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 

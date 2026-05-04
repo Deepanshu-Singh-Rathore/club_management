@@ -54,14 +54,14 @@ from clubs.models import Club, Membership, Event, EventRegistration, Notificatio
 #     ("Tanvi Kulkarni", "tanvi.kulkarni@college.edu", "CS2023012"),
 # ]
 
-# CLUB_HEADS = [
-#     ("Rahul Kapoor", "rahul.kapoor@college.edu", "HEAD001"),
-#     ("Meera Nambiar", "meera.nambiar@college.edu", "HEAD002"),
-#     ("Dev Anand", "dev.anand@college.edu", "HEAD003"),
-#     ("Pooja Saxena", "pooja.saxena@college.edu", "HEAD004"),
-#     ("Vikram Tiwari", "vikram.tiwari@college.edu", "HEAD005"),
-#     ("Ishita Das", "ishita.das@college.edu", "HEAD006"),
-# ]
+CLUB_HEADS = [
+    ("Rahul Kapoor", "rahul.kapoor@college.edu", "HEAD001"),
+    ("Meera Nambiar", "meera.nambiar@college.edu", "HEAD002"),
+    ("Dev Anand", "dev.anand@college.edu", "HEAD003"),
+    ("Pooja Saxena", "pooja.saxena@college.edu", "HEAD004"),
+    ("Vikram Tiwari", "vikram.tiwari@college.edu", "HEAD005"),
+    ("Ishita Das", "ishita.das@college.edu", "HEAD006"),
+]
 
 # EVENTS = [
 #     # Upcoming

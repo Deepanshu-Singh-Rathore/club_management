@@ -15,15 +15,15 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
         applicationId = "com.example.club_management_app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = flutter.versionCode()
+        versionName = flutter.versionName()
     }
 
     buildTypes {

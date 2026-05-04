@@ -87,7 +87,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (data.containsKey('access')) {
-        await ApiService.saveTokens(data['access'], data['refresh']);
+        await ApiService.saveTokens(data['access'] as String, data['refresh'] as String);
 
         // Auto-join the selected club if we have its id
         final clubId = _clubIds[selectedClub];

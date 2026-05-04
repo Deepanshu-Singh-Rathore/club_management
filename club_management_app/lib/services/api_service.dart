@@ -53,15 +53,29 @@ class ApiService {
 
   static dynamic _decode(http.Response res) {
     final body = utf8.decode(res.bodyBytes);
-    final json = jsonDecode(body);
+    dynamic json;
+    try {
+      json = jsonDecode(body);
+    } catch (_) {
+      // Non-JSON response (e.g. Django ALLOWED_HOSTS error page)
+      throw ApiException(res.statusCode,
+          'Server error (${res.statusCode}): ${body.substring(0, body.length.clamp(0, 120))}');
+    }
     if (res.statusCode >= 400) {
-      String msg = 'Request failed';
+      String msg = 'Request failed (${res.statusCode})';
       if (json is Map) {
         final raw = json['error'] ?? json['detail'] ?? json['message'];
         if (raw is String) {
           msg = raw;
         } else if (raw != null) {
           msg = raw.toString();
+        } else {
+          final fieldErrors = json.entries
+              .where((e) => e.value is List)
+              .map((e) => (e.value as List).first?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toList();
+          if (fieldErrors.isNotEmpty) msg = fieldErrors.join(' ');
         }
       }
       throw ApiException(res.statusCode, msg);
@@ -232,12 +246,12 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createEvent({
-  required String title,
-  required String description,
-  required String eventDate,
-  required String clubId,
-  int capacity = 0,
-  String? imageUrl,
+    required String title,
+    required String description,
+    required String eventDate,
+    required String clubId,
+    int capacity = 0,
+    String? imageUrl,
   }) async {
     return await post('/clubs/events/', {
       'title': title,

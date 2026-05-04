@@ -19,6 +19,7 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  String? _error;
   Timer? _pollTimer;
 
   @override
@@ -44,12 +45,13 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
       setState(() {
         _messages = raw.cast<Map<String, dynamic>>();
         _loading = false;
+        _error = null;
       });
       if (wasAtBottom || _messages.length <= 1) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }
   }
 
@@ -99,7 +101,15 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(_error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.red)),
+                        ))
+                    : _messages.isEmpty
                     ? const Center(
                         child: Text('No messages yet. Say hi!',
                             style: TextStyle(color: Colors.grey)))

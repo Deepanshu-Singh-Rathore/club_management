@@ -21,7 +21,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # ---------------------------------------------------------------------------
 SECRET_KEY = env.str('SECRET_KEY', default='django-insecure-abc123xyz456-change-in-prod')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2', '.up.railway.app'])  # type: ignore[call-overload]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2', '.up.railway.app', '.onrender.com'])  # type: ignore[call-overload]
 
 # ---------------------------------------------------------------------------
 # Application definition

@@ -214,6 +214,10 @@ class ApiService {
     return await post('/clubs/$clubId/join/', {}) as Map<String, dynamic>;
   }
 
+  static Future<List<dynamic>> getUserClubs() async {
+    return await get('/clubs/user/my/') as List<dynamic>;
+  }
+
   // =========================================================================
   // EVENTS
   // =========================================================================

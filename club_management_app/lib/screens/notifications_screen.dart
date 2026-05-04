@@ -29,7 +29,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               .map((e) =>
                   AppNotification.fromJson(e as Map<String, dynamic>))
               .toList();
-          _loading = false;
+          _loading = false;  
         });
       }
     } catch (_) {

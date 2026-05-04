@@ -4,6 +4,7 @@ import '../models/club.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'club_detail_screen.dart';
+import 'my_clubs_screen.dart';
 
 class ClubsScreen extends StatefulWidget {
   const ClubsScreen({super.key});
@@ -102,6 +103,14 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyClubsScreen()),
+        ),
+        tooltip: 'My Clubs',
+        child: const Icon(Icons.bookmark),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/clubs_screen.dart';
+import 'screens/my_clubs_screen.dart';
 import 'screens/events_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';

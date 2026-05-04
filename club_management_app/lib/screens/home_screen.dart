@@ -71,10 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.event_outlined),
               selectedIcon: Icon(Icons.event),
               label: 'Events'),
-          NavigationDestination(
-              icon: Icon(Icons.leaderboard_outlined),
-              selectedIcon: Icon(Icons.leaderboard),
-              label: 'Ranks'),
         ],
       ),
       floatingActionButton: (auth.isAdmin || auth.isClubHead)

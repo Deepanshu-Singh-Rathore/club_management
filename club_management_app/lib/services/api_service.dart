@@ -79,6 +79,7 @@ class ApiService {
           'Server error (${res.statusCode}): ${body.substring(0, body.length.clamp(0, 120))}');
     }
     if (res.statusCode >= 400) {
+      print("DEBUG API [${res.statusCode}] Response: $body");
       String msg = 'Request failed (${res.statusCode})';
       if (json is Map) {
         final raw = json['error'] ?? json['detail'] ?? json['message'];

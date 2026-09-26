@@ -1,4 +1,6 @@
 from django.conf import settings
+from django.core.cache import cache
+from django.db.models import Count, Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -34,8 +36,19 @@ class ClubListCreateView(APIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
-        clubs = Club.objects.select_related('created_by').prefetch_related('memberships')
-        return Response(ClubSerializer(clubs, many=True).data)
+        cached_data = cache.get('clubs_list')
+        if cached_data is not None:
+            return Response(cached_data)
+
+        clubs = (
+            Club.objects
+            .select_related('created_by')
+            .annotate(member_count_annotated=Count('memberships'))
+            .order_by('name')
+        )
+        data = ClubSerializer(clubs, many=True).data
+        cache.set('clubs_list', data, timeout=60)
+        return Response(data)
 
     def post(self, request):
         if request.user.role not in ('club_head', 'admin'):
@@ -44,6 +57,8 @@ class ClubListCreateView(APIView):
         serializer = ClubCreateSerializer(data=request.data)
         if serializer.is_valid():
             club = serializer.save(created_by=request.user)
+            cache.delete('clubs_list')
+            cache.delete('admin_dashboard_stats')
             return Response(ClubSerializer(club).data, status=201)
 
         return Response(serializer.errors, status=400)
@@ -53,16 +68,26 @@ class ClubDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk):
-        try:
-            return Club.objects.get(pk=pk)
-        except Club.DoesNotExist:
-            return None
+        return (
+            Club.objects
+            .select_related('created_by')
+            .annotate(member_count_annotated=Count('memberships'))
+            .filter(pk=pk)
+            .first()
+        )
 
     def get(self, request, pk):
+        cache_key = f'club_detail_{pk}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         club = self.get_object(pk)
         if not club:
             return Response({'error': 'Club not found'}, status=404)
-        return Response(ClubSerializer(club).data)
+        data = ClubSerializer(club).data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
 
     def put(self, request, pk):
         club = self.get_object(pk)
@@ -75,6 +100,8 @@ class ClubDetailView(APIView):
         serializer = ClubCreateSerializer(club, data=request.data, partial=True)
         if serializer.is_valid():
             club = serializer.save()
+            cache.delete('clubs_list')
+            cache.delete(f'club_detail_{pk}')
             return Response(ClubSerializer(club).data)
 
         return Response(serializer.errors, status=400)
@@ -88,6 +115,9 @@ class ClubDetailView(APIView):
             return Response({'error': 'Only admin can delete clubs'}, status=403)
 
         club.delete()
+        cache.delete('clubs_list')
+        cache.delete(f'club_detail_{pk}')
+        cache.delete('admin_dashboard_stats')
         return Response(status=204)
 
 
@@ -105,6 +135,10 @@ class ClubJoinView(APIView):
         if not created:
             return Response({'message': 'Already a member'}, status=200)
 
+        cache.delete('clubs_list')
+        cache.delete(f'club_detail_{pk}')
+        cache.delete(f'club_members_{pk}')
+        cache.delete(f'user_clubs_{request.user.id}')
         return Response(MembershipSerializer(membership).data, status=201)
 
 
@@ -116,6 +150,11 @@ class ClubMembersView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
+        cache_key = f'club_members_{pk}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         try:
             club = Club.objects.select_related('created_by').get(pk=pk)
         except Club.DoesNotExist:
@@ -138,12 +177,14 @@ class ClubMembersView(APIView):
             for m in memberships
         ]
 
-        return Response({
+        data = {
             'club_id': str(club.id),
             'club_name': club.name,
             'member_count': len(members),
             'members': members,
-        })
+        }
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
 
 
 class UserClubsView(APIView):
@@ -153,10 +194,16 @@ class UserClubsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        cache_key = f'user_clubs_{request.user.id}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         memberships = (
             Membership.objects
             .filter(user=request.user)
             .select_related('club__created_by')
+            .annotate(club_member_count=Count('club__memberships'))
             .order_by('-joined_at')
         )
         clubs = [
@@ -164,7 +211,7 @@ class UserClubsView(APIView):
                 'id': str(m.club.id),
                 'name': m.club.name,
                 'description': m.club.description,
-                'member_count': m.club.memberships.count(),
+                'member_count': m.club_member_count,
                 'created_by': {
                     'full_name': m.club.created_by.full_name if m.club.created_by else None,
                 } if m.club.created_by else None,
@@ -172,6 +219,7 @@ class UserClubsView(APIView):
             }
             for m in memberships
         ]
+        cache.set(cache_key, clubs, timeout=60)
         return Response(clubs)
 
 
@@ -184,15 +232,27 @@ class EventListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request, *args, **kwargs):
-        events = Event.objects.select_related(
-            'club', 'created_by'
-        ).prefetch_related('registrations')
-
         club_id = request.query_params.get('club')
+        cache_key = f'events_list_{club_id or "all"}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        events = (
+            Event.objects
+            .select_related('club', 'created_by')
+            .annotate(
+                approved_registrations_count=Count('registrations', filter=Q(registrations__status='approved'))
+            )
+            .order_by('-event_date')
+        )
+
         if club_id:
             events = events.filter(club_id=club_id)
 
-        return Response(EventSerializer(events, many=True).data)
+        data = EventSerializer(events, many=True).data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -201,11 +261,7 @@ class EventListCreateView(generics.ListCreateAPIView):
         with transaction.atomic():
             event = serializer.save()
 
-            
             users = User.objects.filter(role__in=['student', 'club_head'])
-
-            print("EVENT CREATED:", event.title)
-            print("TOTAL USERS:", users.count())
 
             notifications = [
                 Notification(
@@ -220,6 +276,11 @@ class EventListCreateView(generics.ListCreateAPIView):
 
             Notification.objects.bulk_create(notifications)
 
+            cache.delete('events_list_all')
+            if event.club_id:
+                cache.delete(f'events_list_{event.club_id}')
+            cache.delete('admin_dashboard_stats')
+
         return Response(serializer.data, status=201)
 
 
@@ -227,16 +288,28 @@ class EventDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk):
-        try:
-            return Event.objects.select_related('club', 'created_by').get(pk=pk)
-        except Event.DoesNotExist:
-            return None
+        return (
+            Event.objects
+            .select_related('club', 'created_by')
+            .annotate(
+                approved_registrations_count=Count('registrations', filter=Q(registrations__status='approved'))
+            )
+            .filter(pk=pk)
+            .first()
+        )
 
     def get(self, request, pk):
+        cache_key = f'event_detail_{pk}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         event = self.get_object(pk)
         if not event:
             return Response({'error': 'Event not found'}, status=404)
-        return Response(EventSerializer(event).data)
+        data = EventSerializer(event).data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
 
     def put(self, request, pk):
         event = self.get_object(pk)
@@ -249,6 +322,11 @@ class EventDetailView(APIView):
         serializer = EventCreateSerializer(event, data=request.data, partial=True)
         if serializer.is_valid():
             event = serializer.save()
+            cache.delete(f'event_detail_{pk}')
+            cache.delete('events_list_all')
+            if event.club_id:
+                cache.delete(f'events_list_{event.club_id}')
+            cache.delete('admin_dashboard_stats')
             return Response(EventSerializer(event).data)
         return Response(serializer.errors, status=400)
 
@@ -260,7 +338,13 @@ class EventDetailView(APIView):
         if request.user.role not in ('club_head', 'admin'):
             return Response({'error': 'Permission denied'}, status=403)
 
+        club_id = event.club_id
         event.delete()
+        cache.delete(f'event_detail_{pk}')
+        cache.delete('events_list_all')
+        if club_id:
+            cache.delete(f'events_list_{club_id}')
+        cache.delete('admin_dashboard_stats')
         return Response(status=204)
 
 
@@ -272,13 +356,20 @@ class MyEventsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        cache_key = f'my_registrations_{request.user.id}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         regs = (
             EventRegistration.objects
             .filter(user=request.user)
-            .select_related('event__club', 'event__created_by')
+            .select_related('user', 'event__club', 'event__created_by')
             .order_by('-created_at')
         )
-        return Response(EventRegistrationSerializer(regs, many=True).data)
+        data = EventRegistrationSerializer(regs, many=True).data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +412,11 @@ class ApplyEventView(APIView):
                 event=event,
                 club=event.club,
             )
+
+        cache.delete(f'my_registrations_{request.user.id}')
+        cache.delete(f'event_detail_{pk}')
+        cache.delete('events_list_all')
+        cache.delete('admin_dashboard_stats')
 
         return Response({'message': 'Applied successfully'}, status=201)
 
@@ -387,6 +483,12 @@ class ApproveRegistrationView(APIView):
             club=reg.event.club,
         )
 
+        cache.delete(f'event_detail_{pk}')
+        cache.delete(f'my_registrations_{reg.user_id}')
+        cache.delete(f'notifications_{reg.user_id}')
+        cache.delete('admin_dashboard_stats')
+        cache.delete('events_list_all')
+
         return Response({
             'message': 'Approved',
             'points_awarded': points
@@ -423,6 +525,10 @@ class RejectRegistrationView(APIView):
             club=reg.event.club,
         )
 
+        cache.delete(f'my_registrations_{reg.user_id}')
+        cache.delete(f'notifications_{reg.user_id}')
+        cache.delete('admin_dashboard_stats')
+
         return Response({'message': 'Rejected'})
 
 
@@ -434,8 +540,20 @@ class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifs = Notification.objects.filter(user=request.user).order_by('-created_at')[:50]
-        return Response(NotificationSerializer(notifs, many=True).data)
+        cache_key = f'notifications_{request.user.id}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        notifs = (
+            Notification.objects
+            .filter(user=request.user)
+            .select_related('event', 'club')
+            .order_by('-created_at')[:50]
+        )
+        data = NotificationSerializer(notifs, many=True).data
+        cache.set(cache_key, data, timeout=30)
+        return Response(data)
 
 
 class MarkNotificationReadView(APIView):
@@ -452,6 +570,7 @@ class MarkNotificationReadView(APIView):
 
         notification.is_read = True
         notification.save(update_fields=['is_read'])
+        cache.delete(f'notifications_{request.user.id}')
 
         return Response({'message': 'Marked as read'})
 
@@ -470,6 +589,12 @@ class EventSuggestionPollView(APIView):
     def get(self, request):
         if request.user.role != 'admin':
             return Response({'error': 'Admin access required'}, status=403)
+
+        cache_key = 'polls_list_all'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         polls = EventSuggestionPoll.objects.prefetch_related('suggestions').all()
         data = [
             {
@@ -478,14 +603,15 @@ class EventSuggestionPollView(APIView):
                 'is_active': p.is_active,
                 'created_at': p.created_at,
                 'closed_at': p.closed_at,
-                'response_count': EventSuggestion.objects.filter(poll=p).count(),
+                'response_count': len(p.suggestions.all()),
                 'suggestions': [
                     {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
-                    for s in EventSuggestion.objects.filter(poll=p)
+                    for s in p.suggestions.all()
                 ],
             }
             for p in polls
         ]
+        cache.set(cache_key, data, timeout=60)
         return Response(data)
 
     def post(self, request):
@@ -499,6 +625,7 @@ class EventSuggestionPollView(APIView):
             is_active=False, closed_at=timezone.now()
         )
         poll = EventSuggestionPoll.objects.create(question=question, created_by=request.user)
+        cache.delete('polls_list_all')
         return Response({'id': str(poll.id), 'question': poll.question, 'is_active': poll.is_active}, status=201)
 
 
@@ -511,7 +638,7 @@ class EventSuggestionPollDetailView(APIView):
 
     def _get_poll(self, pk):
         try:
-            return EventSuggestionPoll.objects.get(pk=pk)
+            return EventSuggestionPoll.objects.prefetch_related('suggestions').get(pk=pk)
         except EventSuggestionPoll.DoesNotExist:
             return None
 
@@ -529,7 +656,7 @@ class EventSuggestionPollDetailView(APIView):
             'closed_at': poll.closed_at,
             'suggestions': [
                 {'phone': s.submitter_phone, 'suggestion': s.suggestion, 'submitted_at': s.submitted_at}
-                for s in EventSuggestion.objects.filter(poll=poll)
+                for s in poll.suggestions.all()
             ],
         }
         return Response(data)
@@ -544,6 +671,7 @@ class EventSuggestionPollDetailView(APIView):
         poll.is_active = False
         poll.closed_at = timezone.now()
         poll.save(update_fields=['is_active', 'closed_at'])
+        cache.delete('polls_list_all')
         return Response({'message': 'Poll closed', 'id': str(poll.id)})
 
 
@@ -570,6 +698,11 @@ class ClubChatView(APIView):
         return Membership.objects.filter(user=user, club=club).exists()
 
     def get(self, request, pk):
+        cache_key = f'club_chat_{pk}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         club = self._get_club(pk)
         if not club:
             return Response({'error': 'Club not found'}, status=404)
@@ -581,7 +714,9 @@ class ClubChatView(APIView):
             .select_related('sender')
             .order_by('created_at')[:100]
         )
-        return Response(ClubMessageSerializer(messages, many=True).data)
+        data = ClubMessageSerializer(messages, many=True).data
+        cache.set(cache_key, data, timeout=15)
+        return Response(data)
 
     def post(self, request, pk):
         club = self._get_club(pk)
@@ -593,6 +728,7 @@ class ClubChatView(APIView):
         if not content:
             return Response({'error': 'content is required'}, status=400)
         msg = ClubMessage.objects.create(club=club, sender=request.user, content=content)
+        cache.delete(f'club_chat_{pk}')
         return Response(ClubMessageSerializer(msg).data, status=201)
 
 
@@ -615,4 +751,5 @@ class EventSuggestionSubmitView(APIView):
             return Response({'error': 'suggestion is required'}, status=400)
 
         EventSuggestion.objects.create(poll=poll, submitter_phone=phone, suggestion=suggestion)
+        cache.delete('polls_list_all')
         return Response({'message': 'Suggestion recorded'}, status=201)

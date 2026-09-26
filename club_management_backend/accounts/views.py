@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.cache import cache
 
 from .models import User, OTPVerification
 from .serializers import (
@@ -125,6 +126,8 @@ class RegisterView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         user = cast(User, serializer.save())
+        cache.delete('admin_users_list')
+        cache.delete('admin_dashboard_stats')
         tokens = get_tokens_for_user(user)
         return Response(
             {**tokens, 'user': UserSerializer(user).data},
@@ -172,7 +175,9 @@ class UserProfileView(APIView):
     def patch(self, request):
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        user = serializer.save()
+        cache.delete(f"jwt_user_{user.id}")
+        cache.delete('admin_users_list')
         return Response(UserSerializer(request.user).data)
 
 
@@ -185,8 +190,13 @@ class AdminUserListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        cached = cache.get('admin_users_list')
+        if cached is not None:
+            return Response(cached)
         users = User.objects.all().order_by('-created_at')
-        return Response(UserSerializer(users, many=True).data)
+        data = UserSerializer(users, many=True).data
+        cache.set('admin_users_list', data, timeout=30)
+        return Response(data)
 
 
 class AdminUserDetailView(APIView):
@@ -223,6 +233,9 @@ class AdminUserDetailView(APIView):
         for field, value in data.items():
             setattr(user, field, value)
         user.save(update_fields=list(data.keys()))
+        cache.delete(f"jwt_user_{user.id}")
+        cache.delete('admin_users_list')
+        cache.delete('admin_dashboard_stats')
 
         return Response(UserSerializer(user).data)
 
@@ -234,6 +247,9 @@ class AdminUserDetailView(APIView):
             return Response({'error': 'Cannot deactivate your own account'}, status=400)
         user.is_active = False
         user.save(update_fields=['is_active'])
+        cache.delete(f"jwt_user_{user.id}")
+        cache.delete('admin_users_list')
+        cache.delete('admin_dashboard_stats')
         return Response({'message': 'User deactivated'})
 
 
@@ -246,13 +262,26 @@ class AdminStatsView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        from clubs.models import Club, Event, EventRegistration
+        cached = cache.get('admin_dashboard_stats')
+        if cached is not None:
+            return Response(cached)
 
-        return Response({
-            'total_users': User.objects.filter(is_active=True).count(),
-            'total_students': User.objects.filter(role='student', is_active=True).count(),
-            'total_club_heads': User.objects.filter(role='club_head', is_active=True).count(),
+        from clubs.models import Club, Event, EventRegistration
+        from django.db.models import Count, Q
+
+        user_counts = User.objects.filter(is_active=True).aggregate(
+            total_users=Count('id'),
+            total_students=Count('id', filter=Q(role='student')),
+            total_club_heads=Count('id', filter=Q(role='club_head')),
+        )
+
+        data = {
+            'total_users': user_counts['total_users'] or 0,
+            'total_students': user_counts['total_students'] or 0,
+            'total_club_heads': user_counts['total_club_heads'] or 0,
             'total_clubs': Club.objects.count(),
             'total_events': Event.objects.count(),
             'pending_registrations': EventRegistration.objects.filter(status='pending').count(),
-        })
+        }
+        cache.set('admin_dashboard_stats', data, timeout=30)
+        return Response(data)

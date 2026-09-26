@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',          # must be first
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.gzip.GZipMiddleware',          # HTTP compression for faster network transfer
     'whitenoise.middleware.WhiteNoiseMiddleware',     # serve static files in prod
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,10 +81,24 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ---------------------------------------------------------------------------
-# Database – single DB_URL connection string
+# Database – single DB_URL connection string with persistent connections
 # ---------------------------------------------------------------------------
 DATABASES = {
-    'default': env.db('DB_URL'),
+    'default': env.db('DB_URL', default='sqlite:///db.sqlite3'),
+}
+# Keep database connections open for 10 minutes (avoids re-establishing TLS on every request)
+DATABASES['default']['CONN_MAX_AGE'] = env.int('DB_CONN_MAX_AGE', default=600)
+DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+# ---------------------------------------------------------------------------
+# Cache – In-memory cache for high-frequency read endpoints
+# ---------------------------------------------------------------------------
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'clubsphere-cache',
+        'TIMEOUT': 60,
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -96,7 +111,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'accounts.authentication.CachedJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',

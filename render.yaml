@@ -38,7 +38,4 @@ services:
         destination: /index.html
     envVars:
       - key: API_URL
-        fromService:
-          type: web
-          name: club-management-backend
-          property: url
+        sync: false

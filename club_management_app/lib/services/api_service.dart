@@ -3,8 +3,25 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
-// Android Emulator ke liye 10.0.2.2 zaroori hai
-const String _base = 'http://127.0.0.1:8000/api';
+// Configurable at build time via --dart-define=API_URL=https://your-backend.onrender.com
+// Automatically ensures the URL has the correct '/api' path.
+// Defaults to http://127.0.0.1:8000/api for local development.
+String _resolveBaseUrl() {
+  const envUrl = String.fromEnvironment('API_URL');
+  if (envUrl.isNotEmpty) {
+    var url = envUrl.trim();
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (!url.endsWith('/api')) {
+      url = '$url/api';
+    }
+    return url;
+  }
+  return 'http://127.0.0.1:8000/api';
+}
+
+final String _base = _resolveBaseUrl();
 
 class ApiException implements Exception {
   final int statusCode;

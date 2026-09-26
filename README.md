@@ -203,7 +203,29 @@ In the Twilio console set the **Incoming Message Webhook** to:
 https://yourdomain.com/api/bot/whatsapp/
 ```
 
-### Flutter Release Build
+### Frontend Web on Render (Static Site — 100% Free)
+
+1. In [Render Dashboard](https://dashboard.render.com), click **New +** → **Static Site**.
+2. Connect your `club_management` GitHub repository.
+3. Configure the build parameters:
+   - **Name:** `club-management-frontend`
+   - **Root Directory:** `club_management_app`
+   - **Build Command:** `bash build.sh`
+   - **Publish Directory:** `build/web`
+4. In **Environment Variables**:
+   - `API_URL`: `https://<your-backend-name>.onrender.com/api`
+5. In **Redirects / Rewrites**:
+   - Add Rewrite: `/*` → `/index.html` (ensures subroute refreshes route to Flutter Web)
+6. Click **Create Static Site**.
+
+### Full-Stack Blueprint Deployment (1-Click via `render.yaml`)
+
+Deploy both backend and frontend simultaneously:
+1. In Render Dashboard, click **New +** → **Blueprint**.
+2. Select your repository.
+3. Render parses [`render.yaml`](render.yaml), provisions the Django web service and Flutter Web static site, and wires up the `API_URL` automatically.
+
+### Mobile Release Builds (Android / iOS)
 
 ```bash
 flutter build apk --release          # Android APK

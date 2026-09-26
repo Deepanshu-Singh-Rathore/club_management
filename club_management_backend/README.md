@@ -63,11 +63,39 @@ python manage.py createsuperuser
 
 ---
 
-## 6. Run Development Server
+## 6. Run Server
 
 ```bash
+# Standard dev server:
 python manage.py runserver
+
+# Or high-performance multi-threaded server (with persistent DB connection pooling):
+waitress-serve --listen=127.0.0.1:8000 --threads=4 core.wsgi:application
 ```
+
+---
+
+## 7. Performance Benchmarking & Optimization
+
+The backend includes a comprehensive benchmark suite (`benchmark_suite.py`) testing latency percentiles (min, median, p95, mean), database query counts, N+1 detection, and concurrent throughput (RPS).
+
+### Benchmark Results Overview
+
+| Metric | Before Optimization | After Optimization | Improvement |
+|---|---|---|---|
+| **Overall Average Latency** | `3,124 ms` | **`653 ms`** | **4.8x faster overall** |
+| **Read Endpoint Median Latency** | `2,300 – 3,440 ms` | **`2.8 – 9.0 ms`** | **300x – 1,200x speedup** |
+| **Events List Throughput** | `1.1 req/s` | **`340.5 req/s`** | **309x throughput increase** |
+| **Clubs List Throughput** | `0.8 req/s` | **`272.5 req/s`** | **340x throughput increase** |
+| **Average Queries per Request** | `3.3 queries` | **`2.5 queries`** | **24% reduction** |
+
+### Run Benchmarks
+
+```bash
+python benchmark_suite.py --iterations 3 --concurrency 1,2,4 --output BENCHMARK_REPORT_OPTIMIZED.md
+```
+
+Detailed reports: [`BENCHMARK_REPORT_OPTIMIZED.md`](BENCHMARK_REPORT_OPTIMIZED.md) and [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md).
 
 ---
 

@@ -30,7 +30,9 @@ db.sqlite3
 db.sqlite3-journal
 media/
 
-# Environment variables (private repo — .env files committed directly)
+# Environment Variables
+.env
+*.env
 
 # ─── Flutter / Dart ───────────────────────────────────────────────
 # Flutter build outputs
@@ -54,6 +56,16 @@ media/
 **/macos/Flutter/Flutter-Release.xcconfig
 **/macos/Flutter/Flutter-Debug.xcconfig
 
+# Windows Generated Files
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+
+# Linux Generated Files
+**/linux/flutter/generated_plugin_registrant.cc
+**/linux/flutter/generated_plugin_registrant.h
+**/linux/flutter/generated_plugins.cmake
+
 # Android
 **/android/.gradle/
 **/android/local.properties
@@ -64,9 +76,6 @@ media/
 whatsapp_bot/node_modules/
 whatsapp_bot/.wwebjs_auth/
 whatsapp_bot/.wwebjs_cache/
-
-# ─── Claude Code ──────────────────────────────────────────────────
-.claude/
 
 # ─── IDE / OS ─────────────────────────────────────────────────────
 .vscode/

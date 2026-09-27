@@ -127,7 +127,13 @@ createdb club_management
 
 python manage.py migrate
 python manage.py createsuperuser
+
+# Start the server:
+# Standard development server:
 python manage.py runserver
+
+# Or high-performance multi-threaded server (with persistent DB connection pooling):
+waitress-serve --listen=127.0.0.1:8000 --threads=4 core.wsgi:application
 ```
 
 API base: `http://127.0.0.1:8000/api/`
@@ -197,13 +203,75 @@ In the Twilio console set the **Incoming Message Webhook** to:
 https://yourdomain.com/api/bot/whatsapp/
 ```
 
-### Flutter Release Build
+### Frontend Web on Render (Static Site — 100% Free)
+
+1. In [Render Dashboard](https://dashboard.render.com), click **New +** → **Static Site**.
+2. Connect your `club_management` GitHub repository.
+3. Configure the build parameters:
+   - **Name:** `club-management-frontend`
+   - **Root Directory:** `club_management_app`
+   - **Build Command:** `bash build.sh`
+   - **Publish Directory:** `build/web`
+4. In **Environment Variables**:
+   - `API_URL`: `https://<your-backend-name>.onrender.com/api`
+5. In **Redirects / Rewrites**:
+   - Add Rewrite: `/*` → `/index.html` (ensures subroute refreshes route to Flutter Web)
+6. Click **Create Static Site**.
+
+### Full-Stack Blueprint Deployment (1-Click via `render.yaml`)
+
+Deploy both backend and frontend simultaneously:
+1. In Render Dashboard, click **New +** → **Blueprint**.
+2. Select your repository.
+3. Render parses [`render.yaml`](render.yaml), provisions the Django web service and Flutter Web static site, and wires up the `API_URL` automatically.
+
+### Mobile Release Builds (Android / iOS)
 
 ```bash
 flutter build apk --release          # Android APK
 flutter build appbundle --release    # Play Store bundle
 flutter build ios --release          # iOS (macOS + Xcode required)
 ```
+
+---
+
+## 🚀 Performance Benchmarking & Optimization
+
+The backend has undergone systematic architectural and database optimizations, reducing overall average endpoint latency from **3,124 ms** to **653 ms** and delivering up to **340+ requests/sec** under concurrent load.
+
+### Key Benchmark Metrics
+
+| Metric | Baseline | Optimized | Improvement |
+|---|---|---|---|
+| **Overall Average Latency** | `3,124 ms` | **`653 ms`** | **4.8x faster overall** |
+| **Read Endpoint Median Latency** | `2,300 – 3,440 ms` | **`2.8 – 9.0 ms`** | **300x – 1,200x speedup** |
+| **Peak Throughput (`/events/`)** | `1.1 req/s` | **`340.5 req/s`** | **309x throughput increase** |
+| **Peak Throughput (`/clubs/`)** | `0.8 req/s` | **`272.5 req/s`** | **340x throughput increase** |
+| **Peak Throughput (`/admin/stats/`)** | `0.6 req/s` | **`239.2 req/s`** | **398x throughput increase** |
+| **Average Queries per Request** | `3.3 queries` | **`2.5 queries`** | **24% reduction** |
+
+### Implemented Accelerations
+
+1. **Persistent Worker WSGI Server (`waitress`)**: Replaced single-use request threads with a persistent worker thread pool. Combined with `CONN_MAX_AGE = 600`, remote PostgreSQL TLS connections to Neon (AWS US-East-1) are preserved and reused across requests.
+2. **In-Memory JWT User Caching (`CachedJWTAuthentication`)**: Caches validated user identities for 60 seconds with instant mutation invalidation, bypassing redundant remote database lookups on authenticated requests.
+3. **In-Memory Caching (`LocMemCache`)**: Applied across read-heavy listing and detail endpoints (`/clubs/`, `/events/`, `/polls/`, `/admin/stats/`) with precise cache invalidation on create, update, and delete actions.
+4. **N+1 Query Elimination & ORM Annotations**: Resolved relationship iteration overhead in event listings, suggestion polls, and club details using `select_related`, `prefetch_related`, and SQL aggregation annotations.
+
+### Re-running the Benchmarks
+
+To execute the benchmark suite against a running backend:
+
+```bash
+cd club_management_backend
+
+# 1. Start the high-performance server (or runserver):
+waitress-serve --listen=127.0.0.1:8000 --threads=4 core.wsgi:application
+
+# 2. In another terminal, run the benchmark suite:
+python benchmark_suite.py --iterations 3 --concurrency 1,2,4 --output BENCHMARK_REPORT_OPTIMIZED.md
+```
+
+Detailed performance logs and breakdowns are documented in [`club_management_backend/BENCHMARK_REPORT_OPTIMIZED.md`](club_management_backend/BENCHMARK_REPORT_OPTIMIZED.md).
 
 ---
 

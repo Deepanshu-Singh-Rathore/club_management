@@ -17,11 +17,21 @@ env = environ.Env(
 environ.Env.read_env(BASE_DIR / '.env')
 
 # ---------------------------------------------------------------------------
-# Security
+# Security & Host Configuration
 # ---------------------------------------------------------------------------
 SECRET_KEY = env.str('SECRET_KEY', default='django-insecure-abc123xyz456-change-in-prod')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '10.0.2.2', '.up.railway.app', '.onrender.com'])  # type: ignore[call-overload]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*', '127.0.0.1', 'localhost', '10.0.2.2', '.up.railway.app', '.onrender.com', '.vercel.app'])  # type: ignore[call-overload]
+
+# Reverse proxy SSL & Host headers (crucial for Vercel, Render, Railway, AWS Lambda)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+# Production security headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -45,6 +55,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',          # must be first
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.gzip.GZipMiddleware',          # HTTP compression for faster network transfer
     'whitenoise.middleware.WhiteNoiseMiddleware',     # serve static files in prod
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -55,9 +66,37 @@ MIDDLEWARE = [
 ]
 
 # ---------------------------------------------------------------------------
-# CORS – mobile apps don't enforce CORS, allow all origins
+# CORS & CSRF Configuration
 # ---------------------------------------------------------------------------
+from corsheaders.defaults import default_headers
+
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'authorization',
+    'content-type',
+    'accept',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_EXPOSE_HEADERS = [
+    'Content-Type',
+    'X-CSRFToken',
+]
+
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=[
+        'https://*.vercel.app',
+        'https://*.onrender.com',
+        'https://*.railway.app',
+        'http://localhost:3000',
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+    ],
+)
 
 ROOT_URLCONF = 'core.urls'
 
@@ -80,10 +119,24 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ---------------------------------------------------------------------------
-# Database – single DB_URL connection string
+# Database – single DB_URL connection string with persistent connections
 # ---------------------------------------------------------------------------
 DATABASES = {
-    'default': env.db('DB_URL'),
+    'default': env.db('DB_URL', default='sqlite:///db.sqlite3'),
+}
+# Keep database connections open for 10 minutes (avoids re-establishing TLS on every request)
+DATABASES['default']['CONN_MAX_AGE'] = env.int('DB_CONN_MAX_AGE', default=600)
+DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+# ---------------------------------------------------------------------------
+# Cache – In-memory cache for high-frequency read endpoints
+# ---------------------------------------------------------------------------
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'clubsphere-cache',
+        'TIMEOUT': 60,
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -96,7 +149,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'accounts.authentication.CachedJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -160,8 +213,8 @@ USE_TZ = True
 # ---------------------------------------------------------------------------
 # Static files
 # ---------------------------------------------------------------------------
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

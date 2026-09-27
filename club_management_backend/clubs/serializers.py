@@ -25,6 +25,10 @@ class ClubSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_by', 'created_at')
 
     def get_member_count(self, obj):
+        if hasattr(obj, 'member_count_annotated'):
+            return obj.member_count_annotated
+        if hasattr(obj, '_prefetched_objects_cache') and 'memberships' in obj._prefetched_objects_cache:
+            return len(obj.memberships.all())
         return obj.memberships.count()
 
 
@@ -67,6 +71,10 @@ class EventSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_by', 'created_at', 'club_name', 'registered_count')
 
     def get_registered_count(self, obj):
+        if hasattr(obj, 'approved_registrations_count'):
+            return obj.approved_registrations_count
+        if hasattr(obj, '_prefetched_objects_cache') and 'registrations' in obj._prefetched_objects_cache:
+            return sum(1 for r in obj.registrations.all() if r.status == 'approved')
         return obj.registrations.filter(status='approved').count()
 
 

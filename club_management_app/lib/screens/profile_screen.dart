@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/custom_button.dart';
+import '../widgets/custom_textfield.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -43,13 +46,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() => _editing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated!')),
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -61,15 +72,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Confirm Sign Out',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Are you sure you want to log out of your ClubSphere account?',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Logout')),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out'),
+          ),
         ],
       ),
     );
@@ -84,152 +108,329 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    if (user == null) return const Scaffold();
+    if (user == null) return const Scaffold(backgroundColor: AppTheme.background);
 
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('My Profile'),
         actions: [
           if (!_editing)
-            TextButton(
+            TextButton.icon(
               onPressed: () => setState(() => _editing = true),
-              child: const Text('Edit', style: TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Edit'),
             )
           else
-            TextButton(
+            TextButton.icon(
               onPressed: _saving ? null : _save,
-              child: _saving
+              icon: _saving
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Text('Save', style: TextStyle(color: Colors.white)),
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded, size: 16),
+              label: const Text('Save'),
             ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Avatar
-          Center(
-            child: CircleAvatar(
-              radius: 48,
-              backgroundColor: const Color(0xFF0D47A1).withOpacity(0.12),
-              child: Text(
-                user.displayName[0].toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Profile Header Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.border),
+                  boxShadow: AppTheme.softShadow,
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: AppTheme.softShadow,
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.displayName.isNotEmpty
+                              ? user.displayName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      user.displayName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _roleBadge(user.role),
+                        if (user.role == 'student') ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFFA7F3D0),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.verified_rounded,
+                                  size: 14,
+                                  color: Color(0xFF059669),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Verified Member',
+                                  style: TextStyle(
+                                    color: Color(0xFF065F46),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+
+              const SizedBox(height: 24),
+
+              // Profile Details Section
+              const Text(
+                'Personal Information',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border),
+                  boxShadow: AppTheme.softShadow,
+                ),
+                child: Column(
+                  children: [
+                    if (_editing) ...[
+                      CustomTextField(
+                        controller: _nameCtrl,
+                        labelText: 'Full Name',
+                        hintText: 'Enter your name',
+                        icon: Icons.person_outline_rounded,
+                      ),
+                      const SizedBox(height: 14),
+                      CustomTextField(
+                        controller: _phoneCtrl,
+                        labelText: 'WhatsApp Phone Number',
+                        hintText: '+91 9876543210',
+                        icon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 14),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _nameCtrl.text = user.fullName;
+                            _phoneCtrl.text = user.phoneNumber ?? '';
+                            _editing = false;
+                          });
+                        },
+                        child: const Text('Cancel Editing'),
+                      ),
+                    ] else ...[
+                      _profileInfoRow(
+                        Icons.person_outline_rounded,
+                        'Full Name',
+                        user.displayName,
+                      ),
+                      const Divider(height: 24),
+                      _profileInfoRow(
+                        Icons.email_outlined,
+                        'Email Address',
+                        user.email,
+                      ),
+                      if (user.rollNumber != null &&
+                          user.rollNumber!.isNotEmpty) ...[
+                        const Divider(height: 24),
+                        _profileInfoRow(
+                          Icons.badge_outlined,
+                          'Roll Number',
+                          user.rollNumber!,
+                        ),
+                      ],
+                      const Divider(height: 24),
+                      _profileInfoRow(
+                        Icons.phone_outlined,
+                        'Phone Number',
+                        user.phoneNumber?.isNotEmpty == true
+                            ? user.phoneNumber!
+                            : 'Not set',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Logout Button
+              CustomButton(
+                text: 'Sign Out',
+                isOutlined: true,
+                backgroundColor: AppTheme.error,
+                textColor: AppTheme.error,
+                icon: Icons.logout_rounded,
+                onPressed: _logout,
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Center(
-            child: _roleBadge(user.role),
-          ),
-          const SizedBox(height: 24),
-
-          // Points card
-
-          // Fields
-          _sectionLabel('Full Name'),
-          const SizedBox(height: 6),
-          _editing
-              ? TextField(
-                  controller: _nameCtrl,
-                  decoration:
-                      const InputDecoration(prefixIcon: Icon(Icons.person)),
-                )
-              : _infoTile(Icons.person, user.displayName),
-
-          const SizedBox(height: 14),
-          _sectionLabel('Email'),
-          const SizedBox(height: 6),
-          _infoTile(Icons.email, user.email),
-
-          if (user.rollNumber != null && user.rollNumber!.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            _sectionLabel('Roll Number'),
-            const SizedBox(height: 6),
-            _infoTile(Icons.badge, user.rollNumber!),
-          ],
-
-          const SizedBox(height: 14),
-          _sectionLabel('Phone'),
-          const SizedBox(height: 6),
-          _editing
-              ? TextField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.phone),
-                      hintText: '+91 XXXXXXXXXX'),
-                )
-              : _infoTile(
-                  Icons.phone,
-                  user.phoneNumber?.isNotEmpty == true
-                      ? user.phoneNumber!
-                      : 'Not set'),
-
-          if (_editing) ...[
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => setState(() => _editing = false),
-              child: const Text('Cancel'),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-
-          // Logout
-          OutlinedButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout, color: Colors.red),
-            label: const Text('Logout', style: TextStyle(color: Colors.red)),
-            style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red)),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _sectionLabel(String label) =>
-      Text(label, style: const TextStyle(fontWeight: FontWeight.bold));
-
-  Widget _infoTile(IconData icon, String value) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
+  Widget _profileInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryTint,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: AppTheme.primary),
         ),
-        child: Row(children: [
-          Icon(icon, size: 18, color: Colors.grey),
-          const SizedBox(width: 10),
-          Text(value, style: const TextStyle(fontSize: 15)),
-        ]),
-      );
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _roleBadge(String role) {
-    final colors = {
-      'admin': Colors.red,
-      'club_head': Colors.purple,
-      'student': Colors.blue,
-    };
-    final labels = {
-      'admin': 'Admin',
-      'club_head': 'Club Head',
-      'student': 'Student',
-    };
-    final c = colors[role] ?? Colors.blue;
+    Color color;
+    Color bg;
+    String label;
+    IconData icon;
+
+    switch (role) {
+      case 'admin':
+        color = const Color(0xFFDC2626);
+        bg = const Color(0xFFFEE2E2);
+        label = 'Administrator';
+        icon = Icons.shield_rounded;
+        break;
+      case 'club_head':
+        color = const Color(0xFF7C3AED);
+        bg = const Color(0xFFEDE9FE);
+        label = 'Club Head';
+        icon = Icons.manage_accounts_rounded;
+        break;
+      case 'student':
+      default:
+        color = AppTheme.primary;
+        bg = AppTheme.primaryTint;
+        label = 'Student';
+        icon = Icons.school_rounded;
+        break;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-          color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-      child: Text(labels[role] ?? role,
-          style: TextStyle(color: c, fontWeight: FontWeight.w600)),
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

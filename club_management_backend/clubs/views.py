@@ -469,15 +469,10 @@ class ApproveRegistrationView(APIView):
         reg.status = 'approved'
         reg.save()
 
-        # ✅ Points
-        points = getattr(settings, 'EVENT_APPROVAL_POINTS', 10)
-        reg.user.points += points
-        reg.user.save(update_fields=['points'])
-
         # ✅ Notification (IMPORTANT FIX)
         Notification.objects.create(
             user=reg.user,
-            message=f'You have been approved for "{reg.event.title}" (+{points} pts)',
+            message=f'Your registration for "{reg.event.title}" has been approved!',
             type='approved',
             event=reg.event,
             club=reg.event.club,
@@ -490,8 +485,7 @@ class ApproveRegistrationView(APIView):
         cache.delete('events_list_all')
 
         return Response({
-            'message': 'Approved',
-            'points_awarded': points
+            'message': 'Approved'
         })
 
 
@@ -573,6 +567,15 @@ class MarkNotificationReadView(APIView):
         cache.delete(f'notifications_{request.user.id}')
 
         return Response({'message': 'Marked as read'})
+
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        cache.delete(f'notifications_{request.user.id}')
+        return Response({'message': 'All marked as read'})
 
 
 # ---------------------------------------------------------------------------

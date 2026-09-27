@@ -25,7 +25,7 @@ class RegisterSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=6, write_only=True)
     phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
     roll_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
-    role = serializers.ChoiceField(choices=['student', 'admin'], default='student')
+    role = serializers.ChoiceField(choices=['student', 'admin', 'club_head'], default='student')
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():

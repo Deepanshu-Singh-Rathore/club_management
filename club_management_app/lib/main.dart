@@ -13,6 +13,8 @@ import 'screens/notifications_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
 import 'screens/event_detail_screen.dart';
+import 'screens/OTP_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,44 +37,12 @@ class ClubSphereApp extends StatelessWidget {
     return MaterialApp(
       title: 'ClubSphere',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0D47A1),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0D47A1),
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0D47A1),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF5F5F5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-        ),
-      ),
+      theme: AppTheme.lightTheme,
       home: const _RootRouter(),
       routes: {
         '/login': (_) => const LoginScreen(),
         '/signup': (_) => const SignupScreen(),
+        '/otp': (_) => const OtpScreen(),
         '/home': (_) => const HomeScreen(),
         '/clubs': (_) => const ClubsScreen(),
         '/events': (_) => const EventsScreen(),

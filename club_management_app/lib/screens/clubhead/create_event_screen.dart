@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/club.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_textfield.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -60,9 +63,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
+      if (!mounted) return;
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.now(),
+        initialTime: const TimeOfDay(hour: 10, minute: 0),
       );
       if (mounted) {
         setState(() {
@@ -78,11 +82,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedClubId == null) {
-      _showSnack('Please select a club', Colors.orange);
+      _showSnack('Please select a club', AppTheme.warning);
       return;
     }
     if (_eventDate == null) {
-      _showSnack('Please pick an event date', Colors.orange);
+      _showSnack('Please select an event date and time', AppTheme.warning);
       return;
     }
 
@@ -97,127 +101,183 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         imageUrl: _imgCtrl.text.trim().isEmpty ? null : _imgCtrl.text.trim(),
       );
       if (mounted) {
-        _showSnack('Event created!', Colors.green);
+        _showSnack('Event created successfully!', AppTheme.success);
         Navigator.pop(context);
       }
     } on ApiException catch (e) {
-      if (mounted) _showSnack(e.message, Colors.red);
+      if (mounted) _showSnack(e.message, AppTheme.error);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   void _showSnack(String msg, Color color) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Event')),
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: const Text('Create New Event'),
+      ),
       body: _loadingClubs
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Title
-                    TextFormField(
-                      controller: _titleCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Event Title',
-                          prefixIcon: Icon(Icons.title)),
-                      validator: (v) =>
-                          v != null && v.isNotEmpty ? null : 'Required',
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.border),
+                      boxShadow: AppTheme.softShadow,
                     ),
-                    const SizedBox(height: 14),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Event Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Fill in the information to publish your club event.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
 
-                    // Description
-                    TextFormField(
-                      controller: _descCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Description',
-                          prefixIcon: Icon(Icons.description),
-                          alignLabelWithHint: true),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 14),
+                          // Title
+                          CustomTextField(
+                            controller: _titleCtrl,
+                            labelText: 'Event Title',
+                            hintText: 'e.g. Annual Hackathon 2026',
+                            icon: Icons.title_rounded,
+                            validator: (v) =>
+                                v != null && v.trim().isNotEmpty
+                                    ? null
+                                    : 'Event title is required',
+                          ),
+                          const SizedBox(height: 16),
 
-                    // Club picker
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedClubId,
-                      decoration: const InputDecoration(
-                          labelText: 'Club',
-                          prefixIcon: Icon(Icons.group)),
-                      items: _clubs
-                          .map((c) => DropdownMenuItem(
-                              value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (v) =>
-                          setState(() => _selectedClubId = v),
-                      validator: (v) => v != null ? null : 'Select a club',
-                    ),
-                    const SizedBox(height: 14),
+                          // Description
+                          CustomTextField(
+                            controller: _descCtrl,
+                            labelText: 'Description',
+                            hintText: 'Describe schedule, requirements, venue…',
+                            icon: Icons.description_outlined,
+                            maxLines: 4,
+                          ),
+                          const SizedBox(height: 16),
 
-                    // Date picker
-                    InkWell(
-                      onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Event Date & Time',
-                          prefixIcon: Icon(Icons.calendar_today),
-                        ),
-                        child: Text(
-                          _eventDate == null
-                              ? 'Tap to pick date'
-                              : DateFormat('dd MMM yyyy, hh:mm a')
-                                  .format(_eventDate!),
-                          style: TextStyle(
-                              color: _eventDate == null
-                                  ? Colors.grey
-                                  : Colors.black),
-                        ),
+                          // Club picker
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedClubId,
+                            decoration: const InputDecoration(
+                              labelText: 'Host Club',
+                              prefixIcon: Icon(Icons.groups_rounded),
+                            ),
+                            items: _clubs
+                                .map((c) => DropdownMenuItem(
+                                      value: c.id,
+                                      child: Text(c.name),
+                                    ))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedClubId = v),
+                            validator: (v) =>
+                                v != null ? null : 'Please select a host club',
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Date picker
+                          InkWell(
+                            onTap: _pickDate,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Event Date & Time',
+                                prefixIcon: Icon(Icons.calendar_today_rounded),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _eventDate == null
+                                        ? 'Select date & start time'
+                                        : DateFormat('EEE, dd MMM yyyy • hh:mm a')
+                                            .format(_eventDate!),
+                                    style: TextStyle(
+                                      color: _eventDate == null
+                                          ? AppTheme.textMuted
+                                          : AppTheme.textPrimary,
+                                      fontWeight: _eventDate == null
+                                          ? FontWeight.normal
+                                          : FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.arrow_drop_down,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Capacity
+                          CustomTextField(
+                            controller: _capCtrl,
+                            labelText: 'Capacity (0 = Unlimited)',
+                            hintText: '0',
+                            icon: Icons.people_outline_rounded,
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Image URL
+                          CustomTextField(
+                            controller: _imgCtrl,
+                            labelText: 'Cover Image URL (Optional)',
+                            hintText: 'https://images.unsplash.com/…',
+                            icon: Icons.image_outlined,
+                            keyboardType: TextInputType.url,
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Submit
+                          CustomButton(
+                            text: 'Publish Event',
+                            isLoading: _loading,
+                            icon: Icons.publish_rounded,
+                            onPressed: _submit,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Capacity
-                    TextFormField(
-                      controller: _capCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: 'Capacity (0 = unlimited)',
-                          prefixIcon: Icon(Icons.people)),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Image URL
-                    TextFormField(
-                      controller: _imgCtrl,
-                      keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(
-                          labelText: 'Image URL (optional)',
-                          prefixIcon: Icon(Icons.image)),
-                    ),
-                    const SizedBox(height: 28),
-
-                    ElevatedButton.icon(
-                      onPressed: _loading ? null : _submit,
-                      icon: _loading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.check),
-                      label: Text(_loading ? 'Creating…' : 'Create Event'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

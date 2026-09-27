@@ -14,6 +14,7 @@ from .views import (
     RejectRegistrationView,
     NotificationListView,
     MarkNotificationReadView,
+    MarkAllNotificationsReadView,
     MyEventsView,
     EventSuggestionPollView,
     EventSuggestionPollDetailView,
@@ -40,7 +41,8 @@ urlpatterns = [
 
     # Notifications ✅ FIXED
     path('notifications/', NotificationListView.as_view()),
-    path('notifications/<uuid:pk>/read/', MarkNotificationReadView.as_view()),
+    path('notifications/read-all/', MarkAllNotificationsReadView.as_view()),
+    path('notifications/<str:pk>/read/', MarkNotificationReadView.as_view()),
 
     # Polls
     path('polls/', EventSuggestionPollView.as_view()),

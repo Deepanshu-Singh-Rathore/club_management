@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
-import '../services/api_service.dart';
 import 'home_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
@@ -21,7 +22,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
 
-  // Maps club display name â†’ backend club id (populated from API)
   final List<String> _clubNames = [
     'Coding Club',
     'Dance Club',
@@ -50,9 +50,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           if (_clubNames.isNotEmpty) selectedClub = _clubNames.first;
         });
       }
-    } catch (_) {
-      // keep static fallback list
-    }
+    } catch (_) {}
   }
 
   @override
@@ -72,7 +70,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (name.isEmpty || email.isEmpty || pass.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields.')),
+        const SnackBar(
+          content: Text('Please fill in all required fields.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -89,7 +90,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (data.containsKey('access')) {
         await ApiService.saveTokens(data['access'] as String, data['refresh'] as String);
 
-        // Auto-join the selected club if we have its id
         final clubId = _clubIds[selectedClub];
         if (clubId != null) {
           await ApiService.joinClub(clubId);
@@ -106,12 +106,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             data.entries.map((e) => '${e.key}: ${e.value}').join('\n');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errors)),
+          SnackBar(content: Text(errors), backgroundColor: AppTheme.error),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection error: $e')),
+        SnackBar(content: Text('Connection error: $e'), backgroundColor: AppTheme.error),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -121,91 +121,108 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEDF1FE),
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text(
-          "Club Registration",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          'Club Registration',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: Colors.black, size: 20),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Join Your Favorite Club âœ¨",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF7B61FF),
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              "Fill in your details to get started.",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-            CustomTextField(
-              hintText: "Full Name",
-              icon: Icons.person_outline,
-              controller: _nameCtrl,
-            ),
-            const SizedBox(height: 20),
-            CustomTextField(
-              hintText: "Roll Number",
-              icon: Icons.numbers_outlined,
-              controller: _rollCtrl,
-            ),
-            const SizedBox(height: 20),
-            CustomTextField(
-              hintText: "Email",
-              icon: Icons.email_outlined,
-              controller: _emailCtrl,
-            ),
-            const SizedBox(height: 20),
-            CustomTextField(
-              hintText: "Password",
-              icon: Icons.lock_outline,
-              isPassword: true,
-              controller: _passCtrl,
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFBFCF6),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.black12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedClub,
-                  isExpanded: true,
-                  items: _clubNames.map((name) {
-                    return DropdownMenuItem<String>(
-                      value: name,
-                      child: Text(name),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setState(() => selectedClub = v!),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Join Your Favorite Club ✨',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Fill in your details to get started.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.border),
+                    boxShadow: AppTheme.cardShadow,
+                  ),
+                  child: Column(
+                    children: [
+                      CustomTextField(
+                        hintText: 'Full Name',
+                        labelText: 'Full Name',
+                        icon: Icons.person_outline_rounded,
+                        controller: _nameCtrl,
+                      ),
+                      const SizedBox(height: 14),
+                      CustomTextField(
+                        hintText: 'Roll Number (Optional)',
+                        labelText: 'Roll Number',
+                        icon: Icons.badge_outlined,
+                        controller: _rollCtrl,
+                      ),
+                      const SizedBox(height: 14),
+                      CustomTextField(
+                        hintText: 'College Email',
+                        labelText: 'Email',
+                        icon: Icons.email_outlined,
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 14),
+                      CustomTextField(
+                        hintText: 'Password',
+                        labelText: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        isPassword: true,
+                        controller: _passCtrl,
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedClub,
+                        decoration: const InputDecoration(
+                          labelText: 'Select Club to Join',
+                          prefixIcon: Icon(Icons.group_outlined),
+                        ),
+                        items: _clubNames.map((name) {
+                          return DropdownMenuItem<String>(
+                            value: name,
+                            child: Text(name),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) setState(() => selectedClub = v);
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      CustomButton(
+                        text: 'Register Now',
+                        isLoading: _isLoading,
+                        onPressed: _register,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 40),
-            _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF4A6CF7)))
-                : CustomButton(text: "Register Now", onPressed: _register),
-          ],
+          ),
         ),
       ),
     );

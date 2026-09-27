@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/club.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class ClubChatScreen extends StatefulWidget {
   final Club club;
@@ -65,7 +66,7 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     }
@@ -82,7 +83,11 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -95,41 +100,133 @@ class _ClubChatScreenState extends State<ClubChatScreen> {
     final myId = context.watch<AuthProvider>().user?.id;
 
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.club.name} Chat')),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(_error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.red)),
-                        ))
-                    : _messages.isEmpty
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  widget.club.name.isNotEmpty
+                      ? widget.club.name[0].toUpperCase()
+                      : 'C',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.club.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '${widget.club.memberCount} members',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: Column(
+            children: [
+              Expanded(
+                child: _loading
                     ? const Center(
-                        child: Text('No messages yet. Say hi!',
-                            style: TextStyle(color: Colors.grey)))
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, i) {
-                          final msg = _messages[i];
-                          final isMe = msg['sender_id'] == myId;
-                          return _MessageBubble(msg: msg, isMe: isMe);
-                        },
-                      ),
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppTheme.error),
+                              ),
+                            ),
+                          )
+                        : _messages.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 48,
+                                      color: AppTheme.textMuted
+                                          .withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'No messages yet',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Be the first to say hi to the club members!',
+                                      style: TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                itemCount: _messages.length,
+                                itemBuilder: (context, i) {
+                                  final msg = _messages[i];
+                                  final isMe = msg['sender_id'] == myId;
+                                  return _MessageBubble(msg: msg, isMe: isMe);
+                                },
+                              ),
+              ),
+              _InputBar(
+                controller: _controller,
+                sending: _sending,
+                onSend: _send,
+              ),
+            ],
           ),
-          _InputBar(
-            controller: _controller,
-            sending: _sending,
-            onSend: _send,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -152,15 +249,18 @@ class _MessageBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.72),
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
         decoration: BoxDecoration(
-          color: isMe ? const Color(0xFF0D47A1) : Colors.grey.shade200,
+          color: isMe ? AppTheme.primary : AppTheme.surface,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
             bottomLeft: Radius.circular(isMe ? 16 : 4),
             bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
+          border: isMe ? null : Border.all(color: AppTheme.border),
+          boxShadow: AppTheme.softShadow,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Column(
@@ -169,22 +269,34 @@ class _MessageBubble extends StatelessWidget {
           children: [
             if (!isMe)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(name,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1))),
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
               ),
-            Text(content,
-                style: TextStyle(
-                    color: isMe ? Colors.white : Colors.black87,
-                    fontSize: 14)),
+            Text(
+              content,
+              style: TextStyle(
+                color: isMe ? Colors.white : AppTheme.textPrimary,
+                fontSize: 14,
+                height: 1.35,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(time,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: isMe ? Colors.white60 : Colors.grey)),
+            Text(
+              time,
+              style: TextStyle(
+                fontSize: 10,
+                color: isMe
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : AppTheme.textMuted,
+              ),
+            ),
           ],
         ),
       ),
@@ -209,53 +321,76 @@ class _InputBar extends StatelessWidget {
   final bool sending;
   final VoidCallback onSend;
 
-  const _InputBar(
-      {required this.controller, required this.sending, required this.onSend});
+  const _InputBar({
+    required this.controller,
+    required this.sending,
+    required this.onSend,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 6,
-                offset: const Offset(0, -2))
-          ],
-        ),
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(top: BorderSide(color: AppTheme.border)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SafeArea(
         child: Row(
           children: [
             Expanded(
               child: TextField(
                 controller: controller,
                 textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
                 decoration: InputDecoration(
-                  hintText: 'Message…',
+                  hintText: 'Type a message…',
+                  hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
                   filled: true,
-                  fillColor: Colors.grey.shade100,
+                  fillColor: AppTheme.surfaceVariant.withValues(alpha: 0.5),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
+                    borderSide: const BorderSide(color: AppTheme.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: AppTheme.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide:
+                        const BorderSide(color: AppTheme.primary, width: 1.4),
                   ),
                 ),
                 onSubmitted: (_) => onSend(),
               ),
             ),
             const SizedBox(width: 8),
-            sending
-                ? const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : IconButton(
-                    onPressed: onSend,
-                    icon: const Icon(Icons.send, color: Color(0xFF0D47A1)),
-                  ),
+            Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: AppTheme.primaryGradient,
+              ),
+              child: IconButton(
+                onPressed: sending ? null : onSend,
+                icon: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+              ),
+            ),
           ],
         ),
       ),

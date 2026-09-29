@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Brand Color Palette - Modern Deep Indigo & Slate
-  static const Color primary = Color(0xFF4F46E5); // Indigo 600
-  static const Color primaryDark = Color(0xFF3730A3); // Indigo 800
-  static const Color primaryLight = Color(0xFF6366F1); // Indigo 500
-  static const Color primaryTint = Color(0xFFEEF2FF); // Indigo 50
+  // Brand Color Palette - Modern University Blue & Slate
+  static const Color primary = Color(0xFF2563EB); // Modern University Blue 600
+  static const Color primaryDark = Color(0xFF1D4ED8); // Blue 700
+  static const Color primaryLight = Color(0xFF3B82F6); // Blue 500
+  static const Color primaryTint = Color(0xFFEFF6FF); // Blue 50
 
   static const Color secondary = Color(0xFF0D9488); // Teal 600
   static const Color secondaryTint = Color(0xFFF0FDFA);
 
-  static const Color accent = Color(0xFF8B5CF6); // Violet 500
-  static const Color accentTint = Color(0xFFF5F3FF);
+  static const Color accent = Color(0xFF6366F1); // Indigo 500
+  static const Color accentTint = Color(0xFFEEF2FF);
 
   static const Color background = Color(0xFFF8FAFC); // Slate 50
   static const Color surface = Color(0xFFFFFFFF);
@@ -20,7 +20,7 @@ class AppTheme {
   static const Color border = Color(0xFFE2E8F0); // Slate 200
   static const Color borderSubtle = Color(0xFFEEF2F6);
 
-  static const Color textPrimary = Color(0xFF0F172A); // Slate 900
+  static const Color textPrimary = Color(0xFF0F172A); // Slate 900 / Navy charcoal
   static const Color textSecondary = Color(0xFF475569); // Slate 600
   static const Color textMuted = Color(0xFF94A3B8); // Slate 400
 
@@ -37,19 +37,19 @@ class AppTheme {
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+    colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
   );
 
   static const LinearGradient heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF0F172A), Color(0xFF312E81), Color(0xFF4F46E5)],
+    colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF1E3A8A)],
   );
 
   static const LinearGradient cardHeaderGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
+    colors: [Color(0xFF1E293B), Color(0xFF2563EB)],
   );
 
   static const LinearGradient meshGradient = LinearGradient(

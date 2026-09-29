@@ -4,10 +4,12 @@ import '../models/club.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/animated_hover_card.dart';
+import '../widgets/entrance_animation.dart';
+import '../widgets/club_card.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/skeleton_loader.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
-import '../widgets/entrance_animation.dart';
 import 'club_detail_screen.dart';
 import 'my_clubs_screen.dart';
 
@@ -67,62 +69,52 @@ class _ClubsScreenState extends State<ClubsScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 800;
+    final isDesktop = screenWidth >= 920;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1140),
           child: Column(
             children: [
               // Search & Actions Header
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                 child: Row(
                   children: [
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: AppTheme.softShadow,
                         ),
                         child: TextField(
                           controller: _search,
                           decoration: InputDecoration(
-                            hintText: 'Search campus clubs by name or category…',
-                            prefixIcon: const Icon(Icons.search_rounded, size: 22),
+                            hintText: 'Search campus clubs by name or keyword…',
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20),
                             suffixIcon: _search.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 18),
                                     onPressed: () => _search.clear(),
                                   )
                                 : null,
-                            filled: true,
-                            fillColor: Colors.transparent,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           ),
                         ),
                       ),
                     ),
                     if (auth.isAdmin || auth.isClubHead) ...[
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       ElevatedButton.icon(
                         onPressed: _showCreateBottomSheet,
-                        icon: const Icon(Icons.add_rounded, size: 20),
+                        icon: const Icon(Icons.add_rounded, size: 18),
                         label: Text(isDesktop ? 'Create Club' : 'New'),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ],
@@ -132,13 +124,13 @@ class _ClubsScreenState extends State<ClubsScreen> {
 
               // Clubs Count Summary
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 4),
                 child: Row(
                   children: [
                     Text(
                       '${_filtered.length} ${_filtered.length == 1 ? 'Club' : 'Clubs'} available',
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textSecondary,
                       ),
@@ -150,67 +142,56 @@ class _ClubsScreenState extends State<ClubsScreen> {
               // Grid/List of Clubs
               Expanded(
                 child: _loading
-                    ? const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ? LayoutBuilder(
+                        builder: (context, constraints) {
+                          final count = isDesktop ? 3 : (constraints.maxWidth > 550 ? 2 : 1);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(24),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: count,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 1.25,
+                            ),
+                            itemCount: 6,
+                            itemBuilder: (_, __) => const ClubCardSkeleton(),
+                          );
+                        },
                       )
                     : RefreshIndicator(
                         onRefresh: _load,
                         color: AppTheme.primary,
                         child: _filtered.isEmpty
-                            ? ListView(
-                                children: const [
-                                  SizedBox(height: 120),
-                                  Icon(
-                                    Icons.groups_outlined,
-                                    size: 56,
-                                    color: AppTheme.textMuted,
-                                  ),
-                                  SizedBox(height: 12),
-                                  Center(
-                                    child: Text(
-                                      'No clubs found matching your search',
-                                      style: TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            ? EmptyState(
+                                icon: Icons.groups_outlined,
+                                title: 'No clubs found',
+                                subtitle: 'No student organizations match your search query. Try clearing search.',
+                                actionLabel: 'Clear Search',
+                                onAction: () => _search.clear(),
                               )
-                            : isDesktop
-                                ? GridView.builder(
-                                    padding: const EdgeInsets.all(20),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                                      maxCrossAxisExtent: 380,
-                                      mainAxisExtent: 180,
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final count = isDesktop ? 3 : (constraints.maxWidth > 550 ? 2 : 1);
+
+                                  return GridView.builder(
+                                    padding: const EdgeInsets.all(24),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: count,
                                       crossAxisSpacing: 16,
                                       mainAxisSpacing: 16,
+                                      childAspectRatio: 1.25,
                                     ),
                                     itemCount: _filtered.length,
                                     itemBuilder: (_, i) => EntranceAnimation(
-                                      delayMs: (i * 40).clamp(0, 400),
-                                      child: _WebClubCard(
+                                      delayMs: (i * 25).clamp(0, 300),
+                                      child: ClubCard(
                                         club: _filtered[i],
                                         onTap: () => _openClub(_filtered[i]),
                                       ),
                                     ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    itemCount: _filtered.length,
-                                    itemBuilder: (_, i) => EntranceAnimation(
-                                      delayMs: (i * 30).clamp(0, 300),
-                                      child: _ClubCard(
-                                        club: _filtered[i],
-                                        onTap: () => _openClub(_filtered[i]),
-                                      ),
-                                    ),
-                                  ),
+                                  );
+                                },
+                              ),
                       ),
               ),
             ],
@@ -251,78 +232,86 @@ class _ClubsScreenState extends State<ClubsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
           decoration: const BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: EdgeInsets.only(
-            left: 28,
-            right: 28,
+            left: 24,
+            right: 24,
             top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.border,
-                      borderRadius: BorderRadius.circular(2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Create Campus Club',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
-                  ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.pop(sheetContext),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Create New Campus Club',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Establish a student organization and publish club activities.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 CustomTextField(
-                  controller: nameCtrl,
                   labelText: 'Club Name',
-                  hintText: 'e.g. Artificial Intelligence Club',
-                  icon: Icons.groups_rounded,
+                  controller: nameCtrl,
+                  hintText: 'e.g. Robotics Club',
                 ),
                 const SizedBox(height: 14),
                 CustomTextField(
+                  labelText: 'Description',
                   controller: descCtrl,
-                  labelText: 'Club Mission & Description',
-                  hintText: 'Describe the club focus, goals, and membership…',
-                  icon: Icons.description_outlined,
-                  maxLines: 3,
+                  hintText: 'What is this club about and what activities does it conduct?',
+                  maxLines: 4,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 CustomButton(
-                  text: 'Create Club',
+                  text: 'Submit Organization',
                   isLoading: creating,
                   onPressed: () async {
-                    if (nameCtrl.text.trim().isEmpty) return;
+                    final name = nameCtrl.text.trim();
+                    final desc = descCtrl.text.trim();
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a club name'),
+                          backgroundColor: AppTheme.warning,
+                        ),
+                      );
+                      return;
+                    }
+
                     setModalState(() => creating = true);
                     try {
                       await ApiService.createClub(
-                        name: nameCtrl.text.trim(),
-                        description: descCtrl.text.trim(),
+                        name: name,
+                        description: desc,
                       );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      _load();
+                      if (mounted) {
+                        Navigator.pop(sheetContext);
+                        _load();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Club created successfully!'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                      }
                     } on ApiException catch (e) {
                       setModalState(() => creating = false);
                       if (mounted) {
@@ -342,225 +331,6 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _WebClubCard extends StatelessWidget {
-  final Club club;
-  final VoidCallback onTap;
-  const _WebClubCard({required this.club, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedHoverCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    club.name.isNotEmpty ? club.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      club.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.person_rounded,
-                          size: 13,
-                          color: AppTheme.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${club.memberCount} members',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Text(
-              club.description.isEmpty
-                  ? 'Official college organization. Join to collaborate and participate in activities.'
-                  : club.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: const [
-              Text(
-                'Explore Club',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primary,
-                ),
-              ),
-              SizedBox(width: 4),
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 14,
-                color: AppTheme.primary,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClubCard extends StatelessWidget {
-  final Club club;
-  final VoidCallback onTap;
-  const _ClubCard({required this.club, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedHoverCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                club.name.isNotEmpty ? club.name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  club.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  club.description.isEmpty
-                      ? 'No description provided'
-                      : club.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryTint,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.person_rounded, size: 13, color: AppTheme.primary),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${club.memberCount}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 13,
-                color: AppTheme.textMuted,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

@@ -212,24 +212,46 @@ class ApiService {
   }
 
   // =========================================================================
+  // =========================================================================
   // CLUBS
   // =========================================================================
 
-  static Future<List<dynamic>> getClubs() async {
-    return await get('/clubs/') as List<dynamic>;
+  static Future<List<dynamic>> getClubs({
+    String? category,
+    String? search,
+    String? sort,
+  }) async {
+    final params = <String>[];
+    if (category != null && category.isNotEmpty) {
+      params.add('category=${Uri.encodeComponent(category)}');
+    }
+    if (search != null && search.isNotEmpty) {
+      params.add('search=${Uri.encodeComponent(search)}');
+    }
+    if (sort != null && sort.isNotEmpty) {
+      params.add('sort=${Uri.encodeComponent(sort)}');
+    }
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await get('/clubs/$qs', auth: false) as List<dynamic>;
   }
 
   static Future<Map<String, dynamic>> getClub(String id) async {
-    return await get('/clubs/$id/') as Map<String, dynamic>;
+    return await get('/clubs/$id/', auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> createClub({
     required String name,
     required String description,
+    String category = 'Technology',
+    String? bannerUrl,
+    String? logoUrl,
   }) async {
     return await post('/clubs/', {
       'name': name,
       'description': description,
+      'category': category,
+      if (bannerUrl != null) 'banner_url': bannerUrl,
+      if (logoUrl != null) 'logo_url': logoUrl,
     }) as Map<String, dynamic>;
   }
 
@@ -246,21 +268,58 @@ class ApiService {
     return await post('/clubs/$clubId/join/', {}) as Map<String, dynamic>;
   }
 
+  static Future<Map<String, dynamic>> leaveClub(String clubId) async {
+    return await post('/clubs/$clubId/leave/', {}) as Map<String, dynamic>;
+  }
+
   static Future<List<dynamic>> getUserClubs() async {
     return await get('/clubs/user/my/') as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> getClubMembers(String clubId,
+      {String? search}) async {
+    final qs = (search != null && search.isNotEmpty)
+        ? '?search=${Uri.encodeComponent(search)}'
+        : '';
+    return await get('/clubs/$clubId/members/$qs') as Map<String, dynamic>;
+  }
+
+  static Future<void> removeClubMember(String clubId, String userId) async {
+    await delete('/clubs/$clubId/members/?user_id=$userId');
+  }
+
+  static Future<Map<String, dynamic>> getClubAnalytics(String clubId) async {
+    return await get('/clubs/$clubId/analytics/') as Map<String, dynamic>;
   }
 
   // =========================================================================
   // EVENTS
   // =========================================================================
 
-  static Future<List<dynamic>> getEvents({String? clubId}) async {
-    final query = clubId != null ? '?club=$clubId' : '';
-    return await get('/clubs/events/$query') as List<dynamic>;
+  static Future<List<dynamic>> getEvents({
+    String? clubId,
+    String? category,
+    String? period,
+    String? search,
+    String? status,
+  }) async {
+    final params = <String>[];
+    if (clubId != null) params.add('club=$clubId');
+    if (category != null && category.isNotEmpty) {
+      params.add('category=${Uri.encodeComponent(category)}');
+    }
+    if (period != null && period.isNotEmpty) params.add('period=$period');
+    if (search != null && search.isNotEmpty) {
+      params.add('search=${Uri.encodeComponent(search)}');
+    }
+    if (status != null && status.isNotEmpty) params.add('status=$status');
+
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await get('/clubs/events/$qs', auth: false) as List<dynamic>;
   }
 
   static Future<Map<String, dynamic>> getEvent(String id) async {
-    return await get('/clubs/events/$id/') as Map<String, dynamic>;
+    return await get('/clubs/events/$id/', auth: false) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> createEvent({
@@ -269,6 +328,10 @@ class ApiService {
     required String eventDate,
     required String clubId,
     int capacity = 0,
+    String venue = 'Campus Auditorium',
+    String category = 'General',
+    String? registrationDeadline,
+    String? schedule,
     String? imageUrl,
   }) async {
     return await post('/clubs/events/', {
@@ -277,8 +340,17 @@ class ApiService {
       'event_date': eventDate,
       'club': clubId,
       'capacity': capacity,
+      'venue': venue,
+      'category': category,
+      if (registrationDeadline != null)
+        'registration_deadline': registrationDeadline,
+      if (schedule != null) 'schedule': schedule,
       if (imageUrl != null) 'image_url': imageUrl,
     }) as Map<String, dynamic>;
+  }
+
+  static Future<void> cancelEvent(String eventId) async {
+    await delete('/clubs/events/$eventId/');
   }
 
   static Future<List<dynamic>> getMyEvents() async {
@@ -287,6 +359,30 @@ class ApiService {
 
   static Future<Map<String, dynamic>> applyForEvent(String eventId) async {
     return await post('/clubs/events/$eventId/apply/', {})
+        as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> cancelEventRegistration(
+      String eventId) async {
+    return await post('/clubs/events/$eventId/cancel/', {})
+        as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> checkInAttendee(String eventId,
+      {String? ticketId, String? registrationId}) async {
+    return await post('/clubs/events/$eventId/check-in/', {
+      if (ticketId != null) 'ticket_id': ticketId,
+      if (registrationId != null) 'registration_id': registrationId,
+    }) as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> getEventRegistrations(String eventId,
+      {String? status, String? attendance}) async {
+    final params = <String>[];
+    if (status != null) params.add('status=$status');
+    if (attendance != null) params.add('attendance=$attendance');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await get('/clubs/events/$eventId/registrations/$qs')
         as Map<String, dynamic>;
   }
 
@@ -306,6 +402,79 @@ class ApiService {
     return await post('/clubs/events/$eventId/reject/', {
       'registration_id': registrationId,
     }) as Map<String, dynamic>;
+  }
+
+  // =========================================================================
+  // COMMUNITY FEED & POSTS
+  // =========================================================================
+
+  static Future<List<dynamic>> getClubFeed(
+      {String? type, String? clubId}) async {
+    final params = <String>[];
+    if (type != null) params.add('type=$type');
+    if (clubId != null) params.add('club=$clubId');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await get('/clubs/feed/$qs', auth: false) as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> getClubPosts(String clubId) async {
+    return await get('/clubs/$clubId/posts/', auth: false) as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createClubPost(
+    String clubId, {
+    required String title,
+    required String content,
+    String postType = 'general',
+    String? imageUrl,
+  }) async {
+    return await post('/clubs/$clubId/posts/', {
+      'title': title,
+      'content': content,
+      'post_type': postType,
+      if (imageUrl != null) 'image_url': imageUrl,
+    }) as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> togglePostLike(String postId) async {
+    return await post('/clubs/posts/$postId/like/', {}) as Map<String, dynamic>;
+  }
+
+  static Future<List<dynamic>> getPostComments(String postId) async {
+    return await get('/clubs/posts/$postId/comments/', auth: false)
+        as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> addPostComment(
+      String postId, String content) async {
+    return await post('/clubs/posts/$postId/comments/', {'content': content})
+        as Map<String, dynamic>;
+  }
+
+  // =========================================================================
+  // ANNOUNCEMENTS
+  // =========================================================================
+
+  static Future<List<dynamic>> getAnnouncements() async {
+    return await get('/clubs/announcements/', auth: false) as List<dynamic>;
+  }
+
+  // =========================================================================
+  // GLOBAL SEARCH & RECOMMENDATIONS & ACHIEVEMENTS
+  // =========================================================================
+
+  static Future<Map<String, dynamic>> globalSearch(String query) async {
+    final qs = Uri.encodeComponent(query);
+    return await get('/clubs/search/?q=$qs', auth: false)
+        as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> getRecommendations() async {
+    return await get('/clubs/recommendations/') as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> getAchievements() async {
+    return await get('/clubs/achievements/') as Map<String, dynamic>;
   }
 
   // =========================================================================

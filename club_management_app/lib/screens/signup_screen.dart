@@ -34,6 +34,18 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
+  String _sanitizePhone(String input) {
+    var cleaned = input.replaceAll(RegExp(r'[\s\-()]'), '').trim();
+    if (cleaned.startsWith('00')) {
+      cleaned = '+${cleaned.substring(2)}';
+    } else if (!cleaned.startsWith('+') && cleaned.length == 10) {
+      cleaned = '+91$cleaned';
+    } else if (!cleaned.startsWith('+') && cleaned.isNotEmpty) {
+      cleaned = '+$cleaned';
+    }
+    return cleaned;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -43,7 +55,7 @@ class _SignupScreenState extends State<SignupScreen> {
             email: _emailCtrl.text.trim(),
             password: _passCtrl.text,
             rollNumber: _rollCtrl.text.trim(),
-            phoneNumber: _phoneCtrl.text.trim(),
+            phoneNumber: _sanitizePhone(_phoneCtrl.text),
           );
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } on ApiException catch (e) {
@@ -274,8 +286,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 if (v == null || v.trim().isEmpty) {
                   return 'Phone number is required';
                 }
-                if (!RegExp(r'^\+?[0-9]{7,15}$').hasMatch(v.trim())) {
-                  return 'Enter a valid phone number';
+                final cleaned = _sanitizePhone(v);
+                if (!RegExp(r'^\+[0-9]{7,15}$').hasMatch(cleaned)) {
+                  return 'Enter a valid phone number (e.g. +91 9876543210)';
                 }
                 return null;
               },

@@ -14,6 +14,9 @@ import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/clubhead/create_event_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/OTP_screen.dart';
+import 'screens/discover_screen.dart';
+import 'screens/community_feed_screen.dart';
+import 'screens/achievements_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -44,6 +47,9 @@ class ClubSphereApp extends StatelessWidget {
         '/signup': (_) => const SignupScreen(),
         '/otp': (_) => const OtpScreen(),
         '/home': (_) => const HomeScreen(),
+        '/discover': (_) => const DiscoverScreen(),
+        '/community': (_) => const CommunityFeedScreen(),
+        '/achievements': (_) => const AchievementsScreen(),
         '/clubs': (_) => const ClubsScreen(),
         '/events': (_) => const EventsScreen(),
         '/profile': (_) => const ProfileScreen(),

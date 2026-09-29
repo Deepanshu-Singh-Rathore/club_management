@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/club.dart';
+import '../models/club_post.dart';
 import '../models/event.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/animated_hover_card.dart';
-import '../widgets/custom_button.dart';
 import '../widgets/entrance_animation.dart';
+import '../widgets/event_card.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/skeleton_loader.dart';
+import 'admin/club_admin_dashboard.dart';
 import 'club_chat_screen.dart';
 
 class ClubDetailScreen extends StatefulWidget {
@@ -19,157 +24,245 @@ class ClubDetailScreen extends StatefulWidget {
 }
 
 class _ClubDetailScreenState extends State<ClubDetailScreen> {
+  // Tab indexes: 0: Overview, 1: Events, 2: Community, 3: Members
+  int _activeTab = 0;
+
   List<Event> _events = [];
-  bool _loading = true;
-  bool _joining = false;
+  bool _loadingEvents = true;
+
+  List<ClubPost> _posts = [];
+  bool _loadingPosts = false;
+  bool _postsLoaded = false;
+
+  List<dynamic> _members = [];
+  bool _loadingMembers = false;
+  bool _membersLoaded = false;
+
   bool _isJoined = false;
+  bool _joining = false;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadOverviewData();
   }
 
-  Future<void> _loadData() async {
+  // Fast initial load: only membership check and events
+  Future<void> _loadOverviewData() async {
+    setState(() => _loadingEvents = true);
     try {
-      final raw = await ApiService.getEvents(clubId: widget.club.id);
+      final futures = await Future.wait([
+        ApiService.getEvents(clubId: widget.club.id),
+        ApiService.getUserClubs(),
+      ]);
+
       if (mounted) {
+        final rawEvents = futures[0];
+        final myClubs = futures[1];
+
         setState(() {
-          _events = raw
-              .map((e) => Event.fromJson(e as Map<String, dynamic>))
-              .toList();
-          _loading = false;
+          _events = rawEvents.map((e) => Event.fromJson(e as Map<String, dynamic>)).toList();
+          _isJoined = myClubs.any((c) => (c as Map)['id'] == widget.club.id);
+          _loadingEvents = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _loadingEvents = false);
     }
-
-    try {
-      final myClubs = await ApiService.getUserClubs();
-      if (mounted) {
-        final isMember = myClubs.any((c) => (c as Map)['id'] == widget.club.id);
-        if (isMember) {
-          setState(() => _isJoined = true);
-        }
-      }
-    } catch (_) {}
   }
 
-  Future<void> _join() async {
-    setState(() => _joining = true);
+  // Lazy loading of Community tab (Section 9 requirement)
+  Future<void> _loadCommunityPosts() async {
+    if (_postsLoaded) return;
+    setState(() => _loadingPosts = true);
     try {
-      await ApiService.joinClub(widget.club.id);
+      final rawPosts = await ApiService.getClubPosts(widget.club.id);
       if (mounted) {
         setState(() {
-          _isJoined = true;
+          _posts = rawPosts.map((p) => ClubPost.fromJson(p as Map<String, dynamic>)).toList();
+          _postsLoaded = true;
+          _loadingPosts = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Joined ${widget.club.name}!'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: AppTheme.warning,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _joining = false);
+    } catch (_) {
+      if (mounted) setState(() => _loadingPosts = false);
     }
+  }
+
+  // Lazy loading of Members tab (Section 9 requirement)
+  Future<void> _loadMembers() async {
+    if (_membersLoaded) return;
+    setState(() => _loadingMembers = true);
+    try {
+      final membersData = await ApiService.getClubMembers(widget.club.id);
+      if (mounted) {
+        setState(() {
+          _members = membersData['members'] ?? [];
+          _membersLoaded = true;
+          _loadingMembers = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMembers = false);
+    }
+  }
+
+  void _onTabSelected(int index) {
+    setState(() => _activeTab = index);
+    if (index == 2) {
+      _loadCommunityPosts();
+    } else if (index == 3) {
+      _loadMembers();
+    }
+  }
+
+  Future<void> _toggleJoin() async {
+    if (_isJoined) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Leave Club', style: TextStyle(fontWeight: FontWeight.w700)),
+          content: Text('Are you sure you want to leave ${widget.club.name}?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Leave Club'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      setState(() => _joining = true);
+      try {
+        await ApiService.leaveClub(widget.club.id);
+        if (mounted) {
+          setState(() {
+            _isJoined = false;
+            _joining = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Left ${widget.club.name}'), backgroundColor: AppTheme.warning),
+          );
+          _loadOverviewData();
+        }
+      } catch (_) {
+        if (mounted) setState(() => _joining = false);
+      }
+    } else {
+      setState(() => _joining = true);
+      try {
+        await ApiService.joinClub(widget.club.id);
+        if (mounted) {
+          setState(() {
+            _isJoined = true;
+            _joining = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Joined ${widget.club.name}!'), backgroundColor: AppTheme.success),
+          );
+          _loadOverviewData();
+        }
+      } catch (_) {
+        if (mounted) setState(() => _joining = false);
+      }
+    }
+  }
+
+  void _shareClub() {
+    Clipboard.setData(ClipboardData(
+      text: 'Check out ${widget.club.name} on ClubSphere! A campus organization for ${widget.club.category}.',
+    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Club info copied to clipboard!'), backgroundColor: AppTheme.success),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 860;
+    final isDesktop = screenWidth >= 920;
+    final isClubAdmin = auth.isAdmin || (auth.isClubHead && widget.club.createdByName == auth.user?.fullName);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Text(
-          widget.club.name,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
+        title: Text(widget.club.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share Club',
+            onPressed: _shareClub,
+          ),
+          IconButton(
             icon: const Icon(Icons.chat_bubble_outline_rounded),
-            tooltip: 'Club Community Chat',
+            tooltip: 'Club Chat',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => ClubChatScreen(club: widget.club),
-              ),
+              MaterialPageRoute(builder: (_) => ClubChatScreen(club: widget.club)),
             ),
           ),
+          if (isClubAdmin) ...[
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              tooltip: 'Club Admin Console',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ClubAdminDashboard(club: widget.club)),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
         ],
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1140),
           child: ListView(
             padding: EdgeInsets.symmetric(
               horizontal: isDesktop ? 24 : 16,
-              vertical: 20,
+              vertical: 24,
             ),
             children: [
-              // Hero Banner & Club Identity Card
+              // Hero Section (Section 9: Banner, Logo, Name, Category, Members, Buttons)
               EntranceAnimation(
-                child: _buildHeroCard(auth, isDesktop),
+                child: _buildHeroSection(isDesktop, isClubAdmin),
               ),
               const SizedBox(height: 24),
 
-              // Desktop Split View vs Mobile Stacked
-              if (isDesktop)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Clean Tab Selector (Section 9: Overview, Events, Community, Members)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   children: [
-                    // Left Column (65%): About + Events Grid
-                    Expanded(
-                      flex: 65,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAboutCard(),
-                          const SizedBox(height: 24),
-                          _buildEventsSection(isGrid: true),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-
-                    // Right Column (35%): Membership Info + Chat Action
-                    Expanded(
-                      flex: 35,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildCommunityCard(),
-                          const SizedBox(height: 16),
-                          _buildLeadershipCard(),
-                        ],
-                      ),
-                    ),
+                    Expanded(child: _tabButton(0, 'Overview', Icons.info_outline_rounded)),
+                    Expanded(child: _tabButton(1, 'Events (${_events.length})', Icons.event_rounded)),
+                    Expanded(child: _tabButton(2, 'Community', Icons.forum_rounded)),
+                    Expanded(child: _tabButton(3, 'Members', Icons.people_outline_rounded)),
                   ],
-                )
-              else ...[
-                _buildAboutCard(),
-                const SizedBox(height: 20),
-                _buildCommunityCard(),
-                const SizedBox(height: 20),
-                _buildEventsSection(isGrid: false),
-              ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Tab Views
+              if (_activeTab == 0)
+                _buildOverviewTab(isDesktop)
+              else if (_activeTab == 1)
+                _buildEventsTab(isDesktop)
+              else if (_activeTab == 2)
+                _buildCommunityTab()
+              else
+                _buildMembersTab(),
             ],
           ),
         ),
@@ -177,155 +270,184 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     );
   }
 
-  Widget _buildHeroCard(AuthProvider auth, bool isDesktop) {
+  Widget _tabButton(int tab, String label, IconData icon) {
+    final isSel = _activeTab == tab;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => _onTabSelected(tab),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSel ? AppTheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSel ? AppTheme.softShadow : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: isSel ? AppTheme.primary : AppTheme.textMuted),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                color: isSel ? AppTheme.primary : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroSection(bool isDesktop, bool isClubAdmin) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.softShadow,
+        boxShadow: AppTheme.cardShadow,
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Decorative Banner Header
+          // Banner Top Strip
           Container(
-            height: isDesktop ? 130 : 100,
+            height: isDesktop ? 120 : 90,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: AppTheme.heroGradient,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            alignment: Alignment.topRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Campus Organization',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            padding: EdgeInsets.all(isDesktop ? 24 : 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar overlapping banner
-                Transform.translate(
-                  offset: const Offset(0, -32),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppTheme.surface, width: 3),
-                          boxShadow: AppTheme.cardShadow,
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.club.name.isNotEmpty
-                                ? widget.club.name[0].toUpperCase()
-                                : 'C',
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryTint,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.group_rounded,
-                                size: 14,
-                                color: AppTheme.primary,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                '${widget.club.memberCount} Members',
-                                style: const TextStyle(
-                                  color: AppTheme.primary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Title and Action Button Row
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Club Monogram Logo
+                    Container(
+                      width: 60,
+                      height: 60,
+                      transform: Matrix4.translationValues(0, -38, 0),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: AppTheme.cardShadow,
+                      ),
+                      child: Center(
+                        child: Text(
+                          widget.club.name.isNotEmpty ? widget.club.name[0].toUpperCase() : 'C',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.club.name,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
-                              letterSpacing: -0.4,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.club.name,
+                                  style: TextStyle(
+                                    fontSize: isDesktop ? 22 : 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryTint,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  widget.club.category,
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primary),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Official Campus Society & Student Community',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textMuted,
-                            ),
+                          Row(
+                            children: [
+                              const Icon(Icons.people_alt_outlined, size: 14, color: AppTheme.textMuted),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${widget.club.memberCount} active members',
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppTheme.border, shape: BoxShape.circle)),
+                              const SizedBox(width: 12),
+                              const Text('Verified Campus Club', style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    if (auth.isStudent) ...[
-                      const SizedBox(width: 16),
-                      SizedBox(
-                        width: isDesktop ? 160 : 130,
-                        child: CustomButton(
-                          text: _isJoined ? 'Joined ✓' : 'Join Club',
-                          isLoading: _joining,
-                          height: 44,
-                          backgroundColor: _isJoined ? AppTheme.success : null,
-                          icon: _isJoined
-                              ? Icons.check_circle_rounded
-                              : Icons.group_add_rounded,
-                          onPressed: (_joining || _isJoined) ? null : _join,
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: AppTheme.borderSubtle),
+                const SizedBox(height: 14),
+
+                // Action Buttons: Join Club & Share
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _joining ? null : _toggleJoin,
+                      icon: _joining
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Icon(_isJoined ? Icons.check_circle_rounded : Icons.person_add_rounded, size: 16),
+                      label: Text(
+                        _isJoined ? 'Joined Member ✓' : 'Join Club',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isJoined ? AppTheme.success : AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: _shareClub,
+                      icon: const Icon(Icons.share_outlined, size: 16),
+                      label: const Text('Share', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    if (isClubAdmin) ...[
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ClubAdminDashboard(club: widget.club)),
+                        ),
+                        icon: const Icon(Icons.dashboard_customize_rounded, size: 16),
+                        label: const Text('Admin Dashboard', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E293B),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ],
@@ -339,336 +461,309 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     );
   }
 
-  Widget _buildAboutCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'About This Club',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            widget.club.description.isEmpty
-                ? 'Welcome to the ${widget.club.name}. Join to take part in official club meetings, collaborative projects, workshops, and inter-college events.'
-                : widget.club.description,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 14,
-              height: 1.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildOverviewTab(bool isDesktop) {
+    final upcomingEvents = _events.where((e) => !e.isCompleted && !e.isCancelled).take(2).toList();
 
-  Widget _buildCommunityCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryTint,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.forum_rounded,
-                  color: AppTheme.primary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Club Community Chat',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Connect directly with club coordinators, fellow members, and ask questions.',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-          CustomButton(
-            text: 'Open Club Chat',
-            icon: Icons.chat_rounded,
-            height: 42,
-            isOutlined: true,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ClubChatScreen(club: widget.club),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeadershipCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Club Information',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _detailRow(Icons.groups_rounded, 'Total Members', '${widget.club.memberCount} students'),
-          const Divider(height: 20),
-          _detailRow(Icons.event_available_rounded, 'Scheduled Events', '${_events.length} activities'),
-          const Divider(height: 20),
-          _detailRow(Icons.verified_user_rounded, 'Status', 'Active Campus Club'),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppTheme.textMuted),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEventsSection({required bool isGrid}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // About Section
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: AppTheme.softShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('About the Organization', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+              const SizedBox(height: 10),
+              Text(
+                widget.club.description.isNotEmpty
+                    ? widget.club.description
+                    : 'Official student organization registered on ClubSphere university network.',
+                style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.6),
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: AppTheme.borderSubtle),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Icon(Icons.person_pin_rounded, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'President / Club Lead: ${widget.club.createdByName ?? 'Appointed Officer'}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Upcoming Events Preview
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Scheduled Club Events',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-                letterSpacing: -0.3,
+            const Text('Upcoming Club Events', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+            if (_events.isNotEmpty)
+              TextButton(
+                onPressed: () => _onTabSelected(1),
+                child: const Text('View All Events →', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
-            ),
-            Text(
-              '${_events.length} ${_events.length == 1 ? 'Event' : 'Events'}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        if (_loading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(36),
-              child: CircularProgressIndicator(strokeWidth: 2.5),
-            ),
-          )
-        else if (_events.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Center(
-              child: Text(
-                'No events scheduled for this club yet.',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-              ),
-            ),
-          )
-        else if (isGrid)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 360,
-              mainAxisExtent: 150,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-            ),
-            itemCount: _events.length,
-            itemBuilder: (_, i) => _buildEventCard(_events[i]),
+        if (_loadingEvents)
+          const EventCardSkeleton()
+        else if (upcomingEvents.isEmpty)
+          const EmptyState(
+            icon: Icons.event_available_rounded,
+            title: 'No upcoming club events',
+            subtitle: 'This club has not announced any upcoming events yet. Check back soon!',
           )
         else
-          ..._events.map(_buildEventCard),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final count = constraints.maxWidth >= 720 ? 2 : 1;
+              return GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: upcomingEvents.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: count,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: constraints.maxWidth >= 720 ? 1.7 : 1.35,
+                ),
+                itemBuilder: (ctx, i) {
+                  final ev = upcomingEvents[i];
+                  return EventCard(
+                    event: ev,
+                    onTap: () => Navigator.pushNamed(context, '/event-detail', arguments: ev.id),
+                  );
+                },
+              );
+            },
+          ),
       ],
     );
   }
 
-  Widget _buildEventCard(Event e) {
-    return AnimatedHoverCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      onTap: () {
-        Navigator.pushNamed(context, '/event-detail', arguments: e.id);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryTint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.event_note_rounded,
-                  color: AppTheme.primary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      e.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${e.eventDate.day}/${e.eventDate.month}/${e.eventDate.year}',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _statusChip(e.status),
-            ],
-          ),
-          if (e.capacity > 0) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: (e.registeredCount / e.capacity).clamp(0.0, 1.0),
-                      minHeight: 4,
-                      backgroundColor: AppTheme.surfaceVariant,
-                      color: e.isFull ? AppTheme.error : AppTheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${e.registeredCount}/${e.capacity} seats',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+  Widget _buildEventsTab(bool isDesktop) {
+    if (_loadingEvents) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final count = isDesktop ? 2 : 1;
+          return GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: 4,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: count,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.6,
             ),
-          ],
-        ],
-      ),
+            itemBuilder: (_, __) => const EventCardSkeleton(),
+          );
+        },
+      );
+    }
+
+    if (_events.isEmpty) {
+      return const EmptyState(
+        icon: Icons.event_busy_rounded,
+        title: 'No events found',
+        subtitle: 'This organization has not hosted any events yet.',
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = isDesktop ? 2 : 1;
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: _events.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: count,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: isDesktop ? 1.7 : 1.35,
+          ),
+          itemBuilder: (ctx, i) {
+            final ev = _events[i];
+            return EventCard(
+              event: ev,
+              onTap: () => Navigator.pushNamed(context, '/event-detail', arguments: ev.id),
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _statusChip(String status) {
-    final color = AppTheme.statusColor(status);
-    final bg = AppTheme.statusBgColor(status);
+  Widget _buildCommunityTab() {
+    if (_loadingPosts) {
+      return const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+      );
+    }
+
+    if (_posts.isEmpty) {
+      return const EmptyState(
+        icon: Icons.forum_outlined,
+        title: 'No community posts yet',
+        subtitle: 'Announcements and club discussions will appear here.',
+      );
+    }
+
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: _posts.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (ctx, i) {
+        final p = _posts[i];
+        final isAnnouncement = p.postType == 'announcement';
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isAnnouncement ? AppTheme.primaryLight.withValues(alpha: 0.4) : AppTheme.border),
+            boxShadow: AppTheme.softShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 17,
+                    backgroundColor: isAnnouncement ? AppTheme.primaryTint : AppTheme.surfaceVariant,
+                    child: Text(
+                      p.authorName.isNotEmpty ? p.authorName[0].toUpperCase() : 'A',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: isAnnouncement ? AppTheme.primary : AppTheme.textPrimary, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.authorName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                        Text(
+                          DateFormat('MMM d, y • h:mm a').format(p.createdAt.toLocal()),
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isAnnouncement)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: AppTheme.primaryTint, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('NOTICE', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 10)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(p.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.textPrimary)),
+              const SizedBox(height: 6),
+              Text(p.content, style: const TextStyle(fontSize: 13.5, color: AppTheme.textSecondary, height: 1.5)),
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: AppTheme.borderSubtle),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.favorite_rounded, size: 16, color: Color(0xFFEF4444)),
+                  const SizedBox(width: 5),
+                  Text('${p.likesCount} likes', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.comment_outlined, size: 16, color: AppTheme.textMuted),
+                  const SizedBox(width: 5),
+                  Text('${p.commentsCount} comments', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMembersTab() {
+    if (_loadingMembers) {
+      return const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+      );
+    }
+
+    if (_members.isEmpty) {
+      return const EmptyState(
+        icon: Icons.groups_outlined,
+        title: 'No members directory',
+        subtitle: 'Members will be listed here as students join this club.',
+      );
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: AppTheme.softShadow,
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
+      child: ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: _members.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (ctx, i) {
+          final m = _members[i] as Map<String, dynamic>;
+          final name = m['user_name'] ?? m['full_name'] ?? 'Student';
+          final email = m['user_email'] ?? '';
+          final role = (m['role'] ?? 'member').toString().toUpperCase();
+
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primaryTint,
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primary),
+              ),
+            ),
+            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            subtitle: Text(email, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: role.contains('HEAD') ? AppTheme.primaryTint : AppTheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                role,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: role.contains('HEAD') ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

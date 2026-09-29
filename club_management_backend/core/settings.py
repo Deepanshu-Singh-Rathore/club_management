@@ -4,6 +4,7 @@ Django settings for ClubSphere – College Club Management System.
 
 from pathlib import Path
 from datetime import timedelta
+import sys
 import environ
 
 # ---------------------------------------------------------------------------
@@ -124,6 +125,11 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': env.db('DB_URL', default='sqlite:///db.sqlite3'),
 }
+if 'test' in sys.argv:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
 # Keep database connections open for 10 minutes (avoids re-establishing TLS on every request)
 DATABASES['default']['CONN_MAX_AGE'] = env.int('DB_CONN_MAX_AGE', default=600)
 DATABASES['default']['CONN_HEALTH_CHECKS'] = True

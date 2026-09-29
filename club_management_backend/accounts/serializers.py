@@ -7,7 +7,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'full_name', 'email', 'phone_number', 'roll_number', 'role', 'points', 'is_verified', 'created_at')
+        fields = (
+            'id', 'full_name', 'email', 'phone_number', 'roll_number',
+            'role', 'points', 'department', 'year_of_study', 'bio',
+            'avatar_url', 'is_verified', 'created_at'
+        )
         read_only_fields = fields
 
 
@@ -16,7 +20,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('full_name', 'phone_number')
+        fields = ('full_name', 'phone_number', 'department', 'year_of_study', 'bio', 'avatar_url')
 
 
 class RegisterSerializer(serializers.Serializer):

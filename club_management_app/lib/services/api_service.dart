@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
 // Configurable at build time via --dart-define=API_URL=https://your-backend.onrender.com
 // Automatically ensures the URL has the correct '/api' path.
-// Defaults to http://127.0.0.1:8000/api for local development.
+// Defaults to live Render backend for web builds, and http://127.0.0.1:8000/api for local dev.
 String _resolveBaseUrl() {
   const envUrl = String.fromEnvironment('API_URL');
   if (envUrl.isNotEmpty) {
@@ -17,6 +18,9 @@ String _resolveBaseUrl() {
       url = '$url/api';
     }
     return url;
+  }
+  if (kIsWeb) {
+    return 'https://club-management-p81p.onrender.com/api';
   }
   return 'http://127.0.0.1:8000/api';
 }

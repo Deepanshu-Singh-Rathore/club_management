@@ -34,7 +34,14 @@
 </head>
 <body>
   <script>
-    // Ensure browsers do not hold stale cached builds
+    // Force delete all stale Service Worker caches & unregister workers
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var name of names) {
+          caches.delete(name);
+        }
+      });
+    }
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (var r of registrations) {
